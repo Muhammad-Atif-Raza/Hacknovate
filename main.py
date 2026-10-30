@@ -266,25 +266,6 @@ def search_rooms(
             detail="Capacity must be at least 1 person.",
         )
 
-    # Campus Operating Hours: 5:00 AM to 9:00 PM (21:00) on the same day
-    if start_utc.date() != end_utc.date():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Rooms can only be requested between 5:00 AM and 9:00 PM on the same day.",
-        )
-
-    if start_utc.hour < 5 or start_utc.hour >= 21:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Rooms can only be requested between 5:00 AM and 9:00 PM.",
-        )
-
-    if end_utc.hour < 5 or end_utc.hour > 21 or (end_utc.hour == 21 and end_utc.minute > 0):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Rooms can only be requested between 5:00 AM and 9:00 PM.",
-        )
-
     # Statuses that lock a room
     blocking_statuses = [
         ReservationStatus.PENDING_PERMISSION,
@@ -421,10 +402,11 @@ def create_booking(
         accompanying_students=students_list,
         start_time=start_utc,
         end_time=end_utc,
-        status=ReservationStatus.PENDING_PERMISSION,
+        status=ReservationStatus.BOOKED,
         created_at=datetime.utcnow(),
     )
     db.add(reservation)
+    current_user.total_bookings += 1
     db.commit()
     db.refresh(reservation)
 

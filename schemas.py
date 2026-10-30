@@ -95,16 +95,6 @@ class ReservationCreate(BaseModel):
         if et <= st:
             raise ValueError("End time must be after start time.")
 
-        if st.date() != et.date():
-            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM on the same day.")
-
-        # Operating hours: 5:00 AM to 9:00 PM (21:00)
-        if st.hour < 5 or st.hour >= 21:
-            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
-
-        if et.hour < 5 or et.hour > 21 or (et.hour == 21 and et.minute > 0):
-            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
-
         # Cap maximum capacity at 100 people
         total_party = 1 + (len(self.accompanying_students) if self.accompanying_students else self.accompanying_count)
         if total_party > 100:
@@ -157,15 +147,6 @@ class StandbyJoinRequest(BaseModel):
 
         if et <= st:
             raise ValueError("requested_end must be strictly after requested_start")
-
-        if st.date() != et.date():
-            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM on the same day.")
-
-        if st.hour < 5 or st.hour >= 21:
-            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
-
-        if et.hour < 5 or et.hour > 21 or (et.hour == 21 and et.minute > 0):
-            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
 
         return self
 

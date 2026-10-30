@@ -1035,11 +1035,11 @@
         <form id="search-form" novalidate onsubmit="handleSearch(event)">
           <div class="search-form-grid">
             <div class="input-group">
-              <label for="search-start">From Date & Time (5 AM - 9 PM)</label>
+              <label for="search-start">From Date & Time (24/7)</label>
               <input type="datetime-local" id="search-start" class="input-field" onchange="handleStartTimeChange()">
             </div>
             <div class="input-group">
-              <label for="search-end">To Date & Time (Same Day)</label>
+              <label for="search-end">To Date & Time</label>
               <input type="datetime-local" id="search-end" class="input-field">
             </div>
             <div class="input-group">
@@ -1310,7 +1310,7 @@
         <div>
           👥 <strong>Party Size:</strong> <span id="bm-party-size-display">1 Attendee</span>
         </div>
-        <span style="font-size: 0.78rem; color: var(--text-muted);">Available &bull; Requires Faculty Approval</span>
+        <span style="font-size: 0.78rem; color: #16a34a; font-weight: 500;">Instant Allocation &bull; Auto-Approved</span>
       </div>
 
       <!-- Modal Friendly Error Alert Box -->
@@ -1383,20 +1383,13 @@
       });
     }
 
-    // Set initial date/time within campus operating hours (5:00 AM - 9:00 PM)
+    // Set initial date/time (24/7 availability)
     function initializeDateTimeInputs() {
       const now = new Date();
       let targetDate = new Date(now);
-
-      // If current hour is after 20:00 (8:00 PM) or before 5:00 AM, target tomorrow
-      if (now.getHours() >= 20 || now.getHours() < 5) {
-        targetDate.setDate(targetDate.getDate() + 1);
-        targetDate.setHours(10, 0, 0, 0); // Default to 10:00 AM
-      } else {
-        // Round up to next 15 minutes
-        targetDate.setMinutes(Math.ceil(targetDate.getMinutes() / 15) * 15, 0, 0);
-        if (targetDate.getHours() < 5) targetDate.setHours(10, 0, 0, 0);
-        if (targetDate.getHours() >= 20) targetDate.setHours(19, 0, 0, 0);
+      targetDate.setMinutes(Math.ceil(targetDate.getMinutes() / 15) * 15, 0, 0);
+      if (targetDate <= now) {
+        targetDate = new Date(targetDate.getTime() + 15 * 60000);
       }
 
       const start = new Date(targetDate);
@@ -1700,20 +1693,6 @@
           endInput.classList.add('input-error');
           errors.push("End time must be after start time.");
         }
-
-        // Campus Operating Hours Check (5:00 AM to 9:00 PM on same day)
-        const isSameDay = startDate.toDateString() === endDate.toDateString();
-        const startHour = startDate.getHours();
-        const endHour = endDate.getHours();
-        const endMin = endDate.getMinutes();
-
-        const invalidHours = startHour < 5 || startHour >= 21 || endHour < 5 || endHour > 21 || (endHour === 21 && endMin > 0);
-
-        if (!isSameDay || invalidHours) {
-          startInput.classList.add('input-error');
-          endInput.classList.add('input-error');
-          errors.push("Rooms can only be requested between 5:00 AM and 9:00 PM on the same day.");
-        }
       }
 
       // 2. Capacity Check (1 - 100)
@@ -1816,12 +1795,12 @@
             <div class="room-specs">
               <span class="pill-tag tag-neutral">High-Speed Wi-Fi</span>
               <span class="pill-tag tag-neutral">Smart Screen & Audio</span>
-              <span class="pill-tag tag-emerald">● Available for Time Slot</span>
+              <span class="pill-tag tag-emerald">● Instant Allocation &bull; Auto-Approved</span>
             </div>
           </div>
           <div class="room-card-footer">
-            <span style="font-size: 0.85rem; color: var(--text-secondary);">
-              Available &bull; Requires Faculty Approval
+            <span style="font-size: 0.85rem; color: #16a34a; font-weight: 500;">
+              Instant Allocation &bull; Auto-Approved
             </span>
             <button class="btn-pill-dark" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 8px;" onclick='openBookingModal(${JSON.stringify(room)})'>
               Book Room &rarr;
@@ -2069,7 +2048,7 @@
         });
 
         closeBookingModal();
-        showToast(res.message || 'Reservation registered! Awaiting faculty coordinator approval.', 'success');
+        showToast('Reservation confirmed! Instant allocation auto-approved.', 'success');
         switchStudentTab('dashboard');
       } catch (err) {
         console.error('Booking submission error:', err);
