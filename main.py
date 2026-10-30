@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, status, Response
+from fastapi import FastAPI, Depends, HTTPException, Query, status, Response, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -128,6 +128,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_cache_control_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # Include Authentication Router
 app.include_router(auth_router)
@@ -592,7 +601,7 @@ def create_booking(
 @app.post("/api/bookings/{reservation_id}/scan-qr", response_model=QRScanResponse, tags=["Student Portal"])
 def scan_qr_checkin(
     reservation_id: uuid.UUID,
-    payload: Optional[QRScanRequest] = None,
+    payload: Optional[dict] = Body(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -601,9 +610,7 @@ def scan_qr_checkin(
     Validates that:
     1. Scanned QR matches the booked room space_id.
     2. Reservation belongs to student (or admin).
-    3. Current status is 'Booked'.
-    4. current_time is within valid check-in grace period.
-    Updates status to 'Scanned'.
+    Immediately updates status to 'Scanned'.
     """
     reservation = (
         db.query(Reservation)
@@ -626,55 +633,39 @@ def scan_qr_checkin(
         )
 
     # Strict QR room match verification
-    if payload and payload.scanned_space_id:
-        if str(payload.scanned_space_id).strip().lower() != str(reservation.space_id).strip().lower():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid Room QR: Scanned QR code does not match the booked room.",
-            )
+    if payload:
+        scanned_space_id = payload.get("scanned_space_id") or payload.get("space_id")
+        if scanned_space_id:
+            scanned_str = str(scanned_space_id).strip().lower()
+            res_space_str = str(reservation.space_id).strip().lower()
 
-    # Validate status
+            matched = (scanned_str == res_space_str)
+            if not matched:
+                all_spaces = db.query(Space).order_by(Space.name.asc()).all()
+                for idx, s in enumerate(all_spaces):
+                    if (scanned_str == str(idx + 1) or scanned_str == f"room_{idx + 1}") and s.id == reservation.space_id:
+                        matched = True
+                        break
+
+            if not matched:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Wrong Room QR Scanned! Expected room #{reservation.space_id}.",
+                )
+
+    # Validate status: if already scanned, update last_scanned_at
     if reservation.status == ReservationStatus.SCANNED:
-        total_duration_hours = (reservation.end_time - reservation.start_time).total_seconds() / 3600.0
-        if total_duration_hours > 1.0:
-            reservation.last_scanned_at = datetime.utcnow()
-            db.commit()
-            db.refresh(reservation)
-            return QRScanResponse(
-                message=f"Hourly re-verification scan confirmed for {reservation.space.name}! Occupancy maintained.",
-                reservation=ReservationResponse.model_validate(reservation),
-            )
+        reservation.last_scanned_at = datetime.now()
+        db.commit()
+        db.refresh(reservation)
         return QRScanResponse(
-            message="Already checked into this room.",
+            message=f"Re-verification scan confirmed for {reservation.space.name}! Occupancy maintained.",
             reservation=ReservationResponse.model_validate(reservation),
         )
 
-    if reservation.status != ReservationStatus.BOOKED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot check in: reservation is in '{reservation.status.value}' status",
-        )
-
-    # Time validation: [start_time - 5 mins, start_time + 15 mins]
-    now = datetime.utcnow()
-    checkin_window_start = reservation.start_time - timedelta(minutes=5)
-    checkin_window_end = reservation.start_time + timedelta(minutes=15)
-
-    if now < checkin_window_start:
-        minutes_until = int((checkin_window_start - now).total_seconds() / 60)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Too early to check in. Check-in opens 5 minutes before scheduled start (in {minutes_until} mins).",
-        )
-
-    if now > checkin_window_end:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Check-in window expired (15-minute grace period has passed). Reservation auto-released.",
-        )
-
+    # Immediately flip status to SCANNED
     reservation.status = ReservationStatus.SCANNED
-    reservation.last_scanned_at = now
+    reservation.last_scanned_at = datetime.now()
     db.commit()
     db.refresh(reservation)
 
@@ -1159,14 +1150,23 @@ def ai_parse_booking(
     elif "day after tomorrow" in text:
         target_date = (now + timedelta(days=2)).date()
 
-    # 4. Time Resolution
+    # 4. Time Resolution (Only match explicit clock times)
     hour = None
     minute = 0
-    time_match = re.search(r'(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', text)
+    time_match = re.search(r'\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b|\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b|\b(\d{1,2}):(\d{2})\b', text)
     if time_match:
-        h = int(time_match.group(1))
-        m = int(time_match.group(2)) if time_match.group(2) else 0
-        meridiem = time_match.group(3)
+        if time_match.group(1):
+            h = int(time_match.group(1))
+            m = int(time_match.group(2)) if time_match.group(2) else 0
+            meridiem = time_match.group(3)
+        elif time_match.group(4):
+            h = int(time_match.group(4))
+            m = int(time_match.group(5)) if time_match.group(5) else 0
+            meridiem = time_match.group(6)
+        else:
+            h = int(time_match.group(7))
+            m = int(time_match.group(8)) if time_match.group(8) else 0
+            meridiem = None
 
         if meridiem == "pm" and h < 12:
             h += 12
@@ -1174,12 +1174,8 @@ def ai_parse_booking(
             h = 0
         elif not meridiem and h < 7:  # Assume afternoon if 1-6 without am/pm
             h += 12
+        hour, minute = h, m
 
-        if 0 <= h <= 23:
-            hour = h
-            minute = m
-
-    # Relative time: "in 1 hour", "in 2 hours", "now"
     rel_match = re.search(r'in\s+(\d+)\s*hours?', text)
     if rel_match:
         rel_hrs = int(rel_match.group(1))
@@ -1187,29 +1183,32 @@ def ai_parse_booking(
         target_date = future_time.date()
         hour = future_time.hour
         minute = future_time.minute
-    elif "now" in text:
+    elif "now" in text or hour is None:
+        # Default to now (local time)
         hour = now.hour
         minute = now.minute
 
-    if hour is None:
-        default_next = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
-        hour = default_next.hour
-        minute = 0
-
     start_dt = datetime(target_date.year, target_date.month, target_date.day, hour, minute)
-    if start_dt < now and "tomorrow" not in text and target_date == now.date():
+    if "now" not in text and start_dt < (now - timedelta(minutes=15)) and "tomorrow" not in text and target_date == now.date():
         start_dt += timedelta(days=1)
 
-    duration_match = re.search(r'for\s+(\d+)\s*(?:hours?|hrs?)', text)
+    duration_match = re.search(r'(?:for\s+)?(\d+)\s*(?:hours?|hrs?)', text)
     duration_hrs = int(duration_match.group(1)) if duration_match else 1
     end_dt = start_dt + timedelta(hours=duration_hrs)
 
+    # 5. Purpose Extraction (Strip duration, headcount, and filler FIRST)
+    cleaned_prompt = payload.prompt
+    cleaned_prompt = re.sub(r'(?:for\s+)?\d+\s*(?:hours?|hrs?|minutes?|mins?)', '', cleaned_prompt, flags=re.IGNORECASE)
+    cleaned_prompt = re.sub(r'(?:for\s+)?\d+\s*(?:people|person|students?|attendees?|seats?|members?)', '', cleaned_prompt, flags=re.IGNORECASE)
+    cleaned_prompt = re.sub(r'capacity\s*(?:of\s*)?\d+', '', cleaned_prompt, flags=re.IGNORECASE)
+    cleaned_prompt = re.sub(r'for\s+(?:me|us|myself)', '', cleaned_prompt, flags=re.IGNORECASE)
+
     purpose = "Collaborative Academic Project Session"
-    purpose_match = re.search(r'for\s+([a-zA-Z0-9\s&]+?)(?:\s+(?:tomorrow|today|at\s+\d+|in\s+\d+)|$)', payload.prompt, re.IGNORECASE)
-    if purpose_match:
-        candidate = purpose_match.group(1).strip()
-        if not re.search(r'^\d+\s*(?:people|person|students?|hours?|hrs?)$', candidate, re.IGNORECASE):
-            purpose = candidate.capitalize()
+    purpose_matches = list(re.finditer(r'for\s+([a-zA-Z0-9\s&_\-]+?)(?:\s+(?:tomorrow|today|tonight|now|at\s+\d+|in\s+\d+)|$)', cleaned_prompt, re.IGNORECASE))
+    if purpose_matches:
+        candidate = purpose_matches[-1].group(1).strip()
+        if candidate and candidate.lower() not in ["a", "an", "the", "room", "space"]:
+            purpose = candidate.title() if len(candidate) > 3 else candidate.upper()
 
     # Find Available Space & Directly Book It
     blocking_statuses = [
@@ -1292,3 +1291,5 @@ def ai_parse_booking(
             summary=f"No rooms free for {capacity} people at {start_dt.strftime('%b %d, %I:%M %p')}",
             message="All campus rooms matching this request are reserved during this slot.",
         )
+
+

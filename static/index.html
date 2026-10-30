@@ -1548,7 +1548,30 @@
       </div>
 
       <!-- Live Video Viewfinder -->
-      <div id="camera-scanner-reader" style="width: 100%; max-width: 320px; min-height: 240px; margin: 0 auto 1.25rem; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid var(--border);"></div>
+      <div id="camera-scanner-reader" style="width: 100%; max-width: 320px; min-height: 240px; margin: 0 auto 0.75rem; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid var(--border);"></div>
+
+      <!-- Upload QR Image File -->
+      <div style="margin-bottom: 0.75rem; display: flex; justify-content: center;">
+        <label for="qr-file-input" class="btn-pill-outline" style="font-size: 0.82rem; padding: 0.45rem 1rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+          📁 Scan from QR Image File
+        </label>
+        <input type="file" id="qr-file-input" accept="image/*" style="display: none;" onchange="handleQRFileUpload(event)">
+      </div>
+
+      <!-- Quick Verify Plaque Simulator -->
+      <div style="background: rgba(30, 41, 59, 0.04); border: 1px dashed var(--border); border-radius: 10px; padding: 0.65rem 0.85rem; margin-bottom: 1rem; text-align: left;">
+        <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 0.35rem;">
+          🎯 Simulate Scanning Room Plaque:
+        </label>
+        <div style="display: flex; gap: 0.5rem;">
+          <select id="simulate-qr-select" style="flex: 1; font-size: 0.8rem; padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border); background: #ffffff; color: var(--text-primary);">
+            <option value="">-- Choose Plaque to Test --</option>
+          </select>
+          <button class="btn-pill-dark" style="font-size: 0.8rem; padding: 0.4rem 0.85rem; white-space: nowrap;" onclick="triggerSimulatedQRScan()">
+            Test Scan
+          </button>
+        </div>
+      </div>
 
       <div id="camera-scanner-notice" style="font-size: 0.82rem; margin-bottom: 1rem;"></div>
 
@@ -1680,15 +1703,22 @@
       }, 4500);
     }
 
-    // Clean human-readable API request handler
+    // Clean human-readable API request handler with aggressive cache-busting
     async function apiRequest(url, options = {}) {
-      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      const opts = { ...options };
+      const method = (opts.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        url += (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        opts.cache = 'no-store';
+      }
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
       if (AppState.token) {
         headers['Authorization'] = `Bearer ${AppState.token}`;
       }
+      opts.headers = headers;
 
       try {
-        const res = await fetch(url, { ...options, headers });
+        const res = await fetch(url, opts);
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
@@ -2636,17 +2666,24 @@
       if (!text || typeof text !== 'string') return null;
       text = text.trim();
 
-      // Pattern 1: CAMPUS_ROOM_QR::space_id=XYZ
-      const match1 = text.match(/CAMPUS_ROOM_QR::space_id=([a-f0-9\-]+)/i);
+      // Pattern 1: ROOM_ID:XYZ
+      const match0 = text.match(/ROOM_ID:([^\s]+)/i);
+      if (match0) return match0[1];
+
+      // Pattern 2: CAMPUS_ROOM_QR::space_id=XYZ
+      const match1 = text.match(/CAMPUS_ROOM_QR::space_id=([^\s:]+)/i);
       if (match1) return match1[1];
 
-      // Pattern 2: URL with query or hash param ?space_id=XYZ or #scan?space_id=XYZ
-      const match2 = text.match(/[?&#]space_id=([a-f0-9\-]+)/i);
+      // Pattern 3: URL with space_id=XYZ
+      const match2 = text.match(/[?&#]space_id=([^\s&#]+)/i);
       if (match2) return match2[1];
 
-      // Pattern 3: Direct UUID
+      // Pattern 4: Direct UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (uuidRegex.test(text)) return text;
+
+      // Pattern 5: Plain number/room ID
+      if (/^\d+$/.test(text)) return text;
 
       return null;
     }
@@ -2670,7 +2707,61 @@
       const notice = document.getElementById('camera-scanner-notice');
       if (notice) notice.innerHTML = '';
 
+      // Populate simulation dropdown
+      const simSelect = document.getElementById('simulate-qr-select');
+      if (simSelect) {
+        simSelect.innerHTML = '<option value="">-- Choose Plaque to Test --</option>';
+        const allRooms = window.liveStatusRooms || AppState.allSpaces || [];
+        allRooms.forEach(r => {
+          const isTarget = activeScanningSpaceId && String(r.id).toLowerCase() === String(activeScanningSpaceId).toLowerCase();
+          const label = `${r.name} ${isTarget ? '🎯 (Target Room)' : ''}`;
+          const opt = document.createElement('option');
+          opt.value = `ROOM_ID:${r.id}`;
+          opt.textContent = label;
+          simSelect.appendChild(opt);
+        });
+        const invOpt = document.createElement('option');
+        invOpt.value = "RANDOM_INVALID_PLAQUE_XYZ";
+        invOpt.textContent = "❌ Simulate Random / Non-Campus QR";
+        simSelect.appendChild(invOpt);
+      }
+
       startCameraScannerInstance();
+    }
+
+    async function handleQRFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const notice = document.getElementById('camera-scanner-notice');
+        if (notice) notice.innerHTML = '<span style="color: var(--text-secondary);">Scanning image file...</span>';
+        
+        if (!html5QrScanner) {
+          html5QrScanner = new Html5Qrcode("camera-scanner-reader");
+        }
+        const decodedText = await html5QrScanner.scanFile(file, true);
+        if (decodedText) {
+          handleScannedCode(decodedText);
+        }
+      } catch (err) {
+        console.error("QR image scan error:", err);
+        const notice = document.getElementById('camera-scanner-notice');
+        if (notice) {
+          notice.innerHTML = '<div style="background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; padding: 0.65rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem;">❌ Could not detect a valid QR code in the uploaded image. Please try another image.</div>';
+        }
+        showToast('Could not detect a QR code in the uploaded image.', 'error');
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    function triggerSimulatedQRScan() {
+      const sel = document.getElementById('simulate-qr-select');
+      if (!sel || !sel.value) {
+        showToast('Please select a plaque to simulate.', 'warning');
+        return;
+      }
+      handleScannedCode(sel.value);
     }
 
     function startCameraScannerInstance() {
@@ -2712,42 +2803,38 @@
       const notice = document.getElementById('camera-scanner-notice');
       const scannedSpaceId = extractSpaceIdFromQR(decodedText);
 
-      // Case A: Random / Non-Campus QR Code
+      // Case A: No Room ID Found / Invalid QR Code
       if (!scannedSpaceId) {
         scanCooldown = true;
-        const msg = '❌ Invalid QR Code! This is not an official Campus Resource Hub room plaque.';
+        const msg = '❌ Invalid QR Code! This is not a Campus Resource Hub room plaque.';
         if (notice) {
-          notice.innerHTML = `<div style="background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; padding: 0.65rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">${msg}</div>`;
+          notice.innerHTML = `<div style="background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; padding: 0.65rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem;">${msg}</div>`;
         }
         showToast(msg, 'error');
-        setTimeout(() => { scanCooldown = false; }, 2500);
+        setTimeout(() => { scanCooldown = false; }, 2000);
         return;
       }
 
-      // Case B: Valid Campus QR, but Wrong Room
-      if (activeScanningSpaceId && String(scannedSpaceId).toLowerCase() !== String(activeScanningSpaceId).toLowerCase()) {
+      // Case B: Scanned room ID does not match expected room
+      if (activeScanningSpaceId && String(scannedSpaceId).trim().toLowerCase() !== String(activeScanningSpaceId).trim().toLowerCase()) {
         scanCooldown = true;
-        const allRooms = window.liveStatusRooms || AppState.allSpaces || [];
-        const scannedRoom = allRooms.find(s => String(s.id).toLowerCase() === String(scannedSpaceId).toLowerCase());
-        const scannedRoomName = scannedRoom ? scannedRoom.name : 'a different room';
-        const msg = `❌ Wrong Room QR Scanned! You booked ${activeScanningRoomName}, but scanned the QR code for ${scannedRoomName}.`;
+        const msg = `❌ Wrong Room QR! You booked ${activeScanningRoomName}, but scanned a different room's QR code.`;
         if (notice) {
-          notice.innerHTML = `<div style="background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; padding: 0.65rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">${msg}</div>`;
+          notice.innerHTML = `<div style="background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; padding: 0.65rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem;">${msg}</div>`;
         }
         showToast(msg, 'error');
-        setTimeout(() => { scanCooldown = false; }, 2500);
+        setTimeout(() => { scanCooldown = false; }, 2000);
         return;
       }
 
-      // Case C: Exact Match!
+      // Case C: Exact Room Match!
       scanCooldown = true;
       if (notice) {
-        notice.innerHTML = `<div style="background: #dcfce7; border: 1.5px solid #16a34a; color: #166534; padding: 0.65rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">✅ Room QR Verified! Checking in...</div>`;
+        notice.innerHTML = `<div style="background: #dcfce7; border: 1.5px solid #16a34a; color: #166534; padding: 0.65rem; border-radius: 8px; font-weight: 700; font-size: 0.88rem;">✅ Room QR Verified! Checking in...</div>`;
       }
 
       try {
         const resId = activeScanningResId;
-        const verifiedRoomName = activeScanningRoomName;
         await closeCameraScanner();
 
         const res = await apiRequest(`/api/bookings/${resId}/scan-qr`, {
@@ -2755,11 +2842,13 @@
           body: JSON.stringify({ scanned_space_id: scannedSpaceId })
         });
 
-        showToast(`✅ Physical check-in verified for ${verifiedRoomName}!`, 'success');
-        loadStudentDashboard();
-        if (typeof loadLiveRoomStatus === 'function') {
-          loadLiveRoomStatus('student-live-status-container', true);
-        }
+        showToast('✅ Checked In! Status updated to Scanned.', 'success');
+        await Promise.all([
+          loadStudentDashboard(),
+          typeof loadLiveRoomStatus === 'function' ? loadLiveRoomStatus('student-live-status-container', true) : Promise.resolve(),
+          typeof loadStudentDashboard === 'function' ? loadStudentDashboard() : Promise.resolve(),
+          typeof renderStudentHistory === 'function' && AppState.dashboardData ? renderStudentHistory(AppState.dashboardData.history_by_status || AppState.dashboardData.history || {}) : Promise.resolve()
+        ]);
       } catch (err) {
         console.error('Scan QR verification error:', err);
         showToast(err.message || 'Check-in failed. Please verify with admin.', 'error');
@@ -3182,7 +3271,7 @@
       document.getElementById('plaque-room-cap').textContent = `Cap: ${space.capacity} seats`;
       document.getElementById('plaque-room-acoustic').textContent = `Acoustic: ${space.acoustic_profile}`;
 
-      const plaquePayload = `CAMPUS_ROOM_QR::space_id=${space.id}::name=${encodeURIComponent(space.name)}`;
+      const plaquePayload = `ROOM_ID:${space.id}`;
       const plaqueUrl = document.getElementById('plaque-url-text');
       if (plaqueUrl) {
         plaqueUrl.textContent = `Official University Door Plaque • ID: ${space.id}`;
@@ -3306,7 +3395,7 @@
                   const subText = `${roomObj.capacity} Seats • ${roomObj.acoustic_profile}`;
 
                   return `
-                    <g style="cursor: pointer; pointer-events: all;" onclick="window.handleFloorPlanRoomClick('${roomObj.id}')">
+                    <g style="cursor: pointer; pointer-events: all; position: relative; z-index: 20;" onclick="window.handleFloorPlanRoomClick('${roomObj.id}')">
                       <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" style="pointer-events: none;" />
                       <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B" style="pointer-events: none;">${roomObj.name}</text>
                       <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B" style="pointer-events: none;">${subText}</text>
@@ -3414,21 +3503,36 @@
       const rooms = window.liveStatusRooms || AppState.allSpaces || [];
       const room = rooms.find(s => String(s.id).toLowerCase() === String(roomId).toLowerCase());
       if (!room) return;
+
+      // Populate default start/end times (Now + 5 mins to Now + 65 mins) and capacity = 1
+      const now = new Date();
+      const start = new Date(now.getTime() + 5 * 60000);
+      const end = new Date(now.getTime() + 65 * 60000);
+      const startIso = toLocalISOString(start);
+      const endIso = toLocalISOString(end);
+
+      const startInput = document.getElementById('search-start');
+      const endInput = document.getElementById('search-end');
+      const capInput = document.getElementById('search-capacity');
+      if (startInput) startInput.value = startIso;
+      if (endInput) endInput.value = endIso;
+      if (capInput) capInput.value = 1;
+
+      AppState.searchParams = {
+        startTime: startIso,
+        endTime: endIso,
+        capacity: 1,
+        acousticProfile: room.acoustic_profile
+      };
+
       if (!room.is_occupied) {
-        quickBookSpaceFromLive(room);
+        openBookingModal(room, false);
       } else {
         const currentRes = room.current_reservation;
         if (currentRes && currentRes.status === 'Scanned') {
-          showToast('ℹ️ Room is physically occupied and verified via QR.', 'info');
+          showToast('Room is physically checked into and cannot be overridden.', 'info');
           return;
         }
-        initializeDateTimeInputs();
-        AppState.searchParams = {
-          startTime: document.getElementById('search-start').value,
-          endTime: document.getElementById('search-end').value,
-          capacity: 1,
-          acousticProfile: room.acoustic_profile
-        };
         openBookingModal(room, true);
       }
     };
