@@ -1,0 +1,1964 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartCampus AI | Intelligent Resource Allocation & Booking Platform</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            },
+            darkBg: '#0b1120',
+            darkCard: '#131d36',
+            darkBorder: '#223259',
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0b1120;
+      color: #f1f5f9;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-card {
+      background: rgba(19, 29, 54, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(42, 63, 107, 0.5);
+    }
+    .glass-card-hover:hover {
+      background: rgba(26, 40, 74, 0.85);
+      border-color: rgba(99, 102, 241, 0.4);
+      transform: translateY(-2px);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glow-indigo {
+      box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.3);
+    }
+    .glow-amber {
+      box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.4);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.35);
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b1120;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    /* Pulse animations */
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.01); }
+    }
+    .animate-pulse-glow {
+      animation: pulseGlow 2.5s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- ============================================================== -->
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <!-- ============================================================== -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+  <!-- ============================================================== -->
+  <!-- TOP NAVIGATION BAR -->
+  <!-- ============================================================== -->
+  <header id="main-header" class="sticky top-0 z-40 w-full glass-card border-b border-darkBorder bg-opacity-80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo & App Title -->
+      <div class="flex items-center gap-3 cursor-pointer" onclick="navigateHome()">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-graduation-cap text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">SmartCampus</span>
+            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">AI Platform</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Campus Resource Allocation & Optimization</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs (Only visible when logged in as Student) -->
+      <nav id="student-nav-tabs" class="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+        <button id="tab-btn-dashboard" onclick="switchStudentTab('dashboard')" class="px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150 text-white bg-indigo-600 shadow-sm">
+          <i class="fa-solid fa-house-laptop mr-2 text-indigo-200"></i>My Dashboard
+        </button>
+        <button id="tab-btn-search" onclick="switchStudentTab('search')" class="px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150 text-slate-300 hover:text-white hover:bg-slate-800/60">
+          <i class="fa-solid fa-magnifying-glass mr-2 text-slate-400"></i>Find & Book Space
+        </button>
+      </nav>
+
+      <!-- Right Header: Persona Switcher, User Pill & Logout -->
+      <div class="flex items-center gap-3">
+        
+        <!-- Live Persona Switcher (For rapid hackathon demos) -->
+        <div id="demo-persona-selector" class="relative hidden sm:block">
+          <select id="quick-persona-dropdown" onchange="switchPersona(this.value)" class="text-xs font-medium bg-slate-900/90 text-slate-300 border border-slate-700/80 rounded-lg px-2.5 py-1.5 pr-8 focus:outline-none focus:ring-1 focus:ring-indigo-500 appearance-none cursor-pointer">
+            <option value="" disabled selected>⚡ Quick Switch Persona</option>
+            <option value="agrim">👨‍🎓 Agrim Goel (Student)</option>
+            <option value="priya">👩‍🎓 Priya Sharma (Student 2)</option>
+            <option value="alex">👨‍🎓 Alex Chen (Student 3)</option>
+            <option value="admin">🛡️ Dr. Sarah Connor (Admin)</option>
+          </select>
+          <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+        </div>
+
+        <!-- Logged-in User Pill -->
+        <div id="user-profile-pill" class="hidden items-center gap-2.5 pl-2 pr-3 py-1 bg-slate-800/80 border border-slate-700/60 rounded-full">
+          <img id="header-avatar" src="" alt="Avatar" class="w-7 h-7 rounded-full bg-slate-700 object-cover ring-1 ring-slate-600">
+          <div class="text-left hidden lg:block">
+            <div id="header-name" class="text-xs font-semibold text-slate-200 truncate max-w-[120px]">User</div>
+            <div id="header-role-badge" class="text-[10px] text-slate-400 uppercase font-mono tracking-wider">student</div>
+          </div>
+          <button onclick="handleLogout()" title="Sign Out" class="ml-1 text-slate-400 hover:text-rose-400 transition-colors p-1">
+            <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+          </button>
+        </div>
+
+        <!-- Login Button (Visible when logged out) -->
+        <button id="header-login-btn" onclick="showLoginView()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm">
+          <i class="fa-solid fa-right-to-bracket mr-1.5"></i>Sign In
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ============================================================== -->
+  <!-- MAIN APP CONTAINER -->
+  <!-- ============================================================== -->
+  <main class="flex-1 flex flex-col relative w-full overflow-x-hidden">
+
+    <!-- ============================================================ -->
+    <!-- VIEW 1: AUTHENTICATION & LOGIN SCREEN -->
+    <!-- ============================================================ -->
+    <section id="view-login" class="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div class="max-w-md w-full glass-card p-6 sm:p-8 rounded-2xl shadow-2xl relative overflow-hidden border border-slate-700/80">
+        
+        <!-- Decorative Glow Accents -->
+        <div class="absolute -top-16 -right-16 w-36 h-36 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="absolute -bottom-16 -left-16 w-36 h-36 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <!-- Header -->
+        <div class="text-center mb-6">
+          <div class="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 items-center justify-center text-white text-2xl shadow-xl shadow-indigo-500/25 mb-3">
+            <i class="fa-solid fa-building-columns"></i>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Smart Campus Access</h2>
+          <p class="text-xs text-slate-400 mt-1 max-w-xs mx-auto">AI-Optimized Room Allocation, QR Check-in & Dynamic Standby Reallocation</p>
+        </div>
+
+        <!-- 1-Click Demo Login Personas -->
+        <div class="space-y-2.5 mb-6">
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center flex items-center justify-center gap-2">
+            <span class="h-px bg-slate-700 flex-1"></span>
+            <span>⚡ 1-Click Hackathon Login</span>
+            <span class="h-px bg-slate-700 flex-1"></span>
+          </div>
+
+          <!-- Agrim Goel (Student) -->
+          <button onclick="loginAsDemo('agrimgoel14@gmail.com', 'student', 'Agrim Goel')" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 hover:border-indigo-500/50 transition-all group text-left">
+            <div class="flex items-center gap-3">
+              <img src="https://api.dicebear.com/7.x/bottts/svg?seed=agrimgoel14@gmail.com" class="w-9 h-9 rounded-lg bg-indigo-950/60 p-0.5 border border-indigo-500/40" alt="Agrim">
+              <div>
+                <div class="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">Agrim Goel</div>
+                <div class="text-xs text-slate-400">agrimgoel14@gmail.com</div>
+              </div>
+            </div>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Student</span>
+          </button>
+
+          <!-- Priya Sharma (Student 2) -->
+          <button onclick="loginAsDemo('priya.sharma@campus.edu', 'student', 'Priya Sharma')" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 hover:border-cyan-500/50 transition-all group text-left">
+            <div class="flex items-center gap-3">
+              <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150" class="w-9 h-9 rounded-lg object-cover border border-cyan-500/40" alt="Priya">
+              <div>
+                <div class="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">Priya Sharma</div>
+                <div class="text-xs text-slate-400">priya.sharma@campus.edu</div>
+              </div>
+            </div>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Student 2</span>
+          </button>
+
+          <!-- Dr. Sarah Connor (Admin) -->
+          <button onclick="loginAsDemo('admin@campus.edu', 'admin', 'Dr. Sarah Connor (Faculty Admin)')" class="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 hover:border-purple-500/50 transition-all group text-left">
+            <div class="flex items-center gap-3">
+              <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150" class="w-9 h-9 rounded-lg object-cover border border-purple-500/40" alt="Sarah">
+              <div>
+                <div class="text-sm font-bold text-white group-hover:text-purple-300 transition-colors">Dr. Sarah Connor</div>
+                <div class="text-xs text-slate-400">admin@campus.edu</div>
+              </div>
+            </div>
+            <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Admin</span>
+          </button>
+        </div>
+
+        <!-- Custom / Judge Login Form -->
+        <div class="border-t border-slate-800 pt-5">
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center">Or Custom Judge Sign-In</div>
+          <form onsubmit="handleCustomLogin(event)" class="space-y-3">
+            <div>
+              <input type="text" id="custom-name-input" placeholder="Your Full Name (e.g., Alex Chen)" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" required>
+            </div>
+            <div>
+              <input type="email" id="custom-email-input" placeholder="Your College Email (e.g., judge@campus.edu)" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" required>
+            </div>
+            <div class="flex gap-2">
+              <select id="custom-role-input" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 focus:outline-none focus:border-indigo-500">
+                <option value="student">Role: Student</option>
+                <option value="admin">Role: Admin</option>
+              </select>
+              <button type="submit" class="flex-1 text-xs font-bold py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30">
+                Enter Portal <i class="fa-solid fa-arrow-right ml-1"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- VIEW 2: STUDENT PORTAL (Dashboard & Room Finder) -->
+    <!-- ============================================================ -->
+    <section id="view-student" class="hidden flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <!-- Student Profile Header Banner -->
+      <div class="glass-card rounded-2xl p-5 border border-slate-700/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <img id="student-profile-photo" src="" alt="Profile" class="w-14 h-14 rounded-2xl object-cover ring-2 ring-indigo-500/40 bg-slate-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 id="student-profile-name" class="text-lg font-bold text-white">Student Name</h2>
+              <span class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">STUDENT</span>
+            </div>
+            <p id="student-profile-email" class="text-xs text-slate-400 mt-0.5">student@campus.edu</p>
+            <div class="flex items-center gap-2 mt-1.5 text-xs text-slate-400">
+              <span id="student-profile-id" class="font-mono text-slate-300 font-semibold">STU-000</span>
+              <span>•</span>
+              <span class="text-emerald-400 font-medium"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Active Semester</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics & Quick Action -->
+        <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+          <div class="text-right px-4 py-2 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Total Allotted Bookings</div>
+            <div id="student-total-bookings" class="text-2xl font-black text-white font-mono">0</div>
+          </div>
+          <button onclick="switchStudentTab('search')" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2">
+            <i class="fa-solid fa-plus text-sm"></i>
+            <span>New Booking</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3-Minute Dynamic Standby Flash Claim Glowing Banner (Dynamically shown) -->
+      <div id="standby-flash-claim-banner" class="hidden p-4 rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border-2 border-amber-500/80 glow-amber animate-pulse-glow flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0 border border-amber-500/40">
+            <i class="fa-solid fa-bolt"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500 text-slate-950">Standby Flash Claim</span>
+              <h3 class="text-sm font-bold text-white">An Auto-Released Room Is Available For You!</h3>
+            </div>
+            <p id="standby-banner-text" class="text-xs text-amber-200/90 mt-0.5">
+              A previous booking was cancelled or auto-expired. You have 3 minutes to claim this slot before it rotates!
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="text-center px-3 py-1.5 rounded-lg bg-amber-950/90 border border-amber-500/60">
+            <div class="text-[9px] uppercase font-mono text-amber-300">Time Left</div>
+            <div id="standby-timer-display" class="font-mono text-base font-black text-amber-300">03:00</div>
+          </div>
+          <button id="claim-flash-room-btn" onclick="executeFlashClaim()" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/25">
+            ⚡ Claim Room Now
+          </button>
+        </div>
+      </div>
+
+      <!-- ========================================================== -->
+      <!-- STUDENT TAB 1: DASHBOARD VIEW (Active Bookings, QR & History) -->
+      <!-- ========================================================== -->
+      <div id="student-tab-dashboard" class="space-y-6">
+
+        <!-- Active Booking & 15-Minute QR Verification Portal -->
+        <div id="active-booking-container" class="space-y-4">
+          <!-- Will be rendered dynamically via renderActiveBookingPortal() -->
+        </div>
+
+        <!-- Booking History Section -->
+        <div class="glass-card rounded-2xl p-5 border border-slate-700/80 space-y-4">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i>
+                <span>Reservation History</span>
+              </h3>
+              <p class="text-xs text-slate-400">All student room requests, past allocations, and status tracking</p>
+            </div>
+
+            <!-- Filter Status Badges -->
+            <div class="flex flex-wrap gap-1.5">
+              <button onclick="filterHistory('all')" class="history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white" data-status="all">All</button>
+              <button onclick="filterHistory('Pending_Permission')" class="history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 hover:text-white" data-status="Pending_Permission">Pending</button>
+              <button onclick="filterHistory('Booked')" class="history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 hover:text-white" data-status="Booked">Booked</button>
+              <button onclick="filterHistory('Scanned')" class="history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 hover:text-white" data-status="Scanned">Scanned</button>
+              <button onclick="filterHistory('Expired')" class="history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 hover:text-white" data-status="Expired">Expired</button>
+              <button onclick="filterHistory('Denied')" class="history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 hover:text-white" data-status="Denied">Denied</button>
+            </div>
+          </div>
+
+          <!-- History Grid / Cards Container -->
+          <div id="history-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ========================================================== -->
+      <!-- STUDENT TAB 2: FIND & BOOK ROOM (Search + AI Smart Slot Suggester) -->
+      <!-- ========================================================== -->
+      <div id="student-tab-search" class="hidden space-y-6">
+
+        <!-- Search Filter Card -->
+        <div class="glass-card rounded-2xl p-5 border border-slate-700/80 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-indigo-400"></i>
+                <span>Search Available Spaces</span>
+              </h3>
+              <p class="text-xs text-slate-400">Mathematical conflict-free availability calculation with scikit-learn ML fallback</p>
+            </div>
+            
+            <!-- Quick Demo Peak Congestion Button -->
+            <button onclick="simulatePeakCongestionSearch()" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all flex items-center gap-1.5">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <span>Simulate Peak Congestion</span>
+            </button>
+          </div>
+
+          <!-- Search Form -->
+          <form onsubmit="handleRoomSearch(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-2">
+            
+            <!-- Capacity Input -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Capacity (Attendees)</label>
+              <div class="relative">
+                <input type="number" id="search-capacity" min="1" max="200" value="4" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500" required>
+                <i class="fa-solid fa-user-group absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+              </div>
+            </div>
+
+            <!-- Start Time -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Start Time</label>
+              <input type="datetime-local" id="search-start-time" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500" required>
+            </div>
+
+            <!-- End Time -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">End Time</label>
+              <input type="datetime-local" id="search-end-time" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500" required>
+            </div>
+
+            <!-- Acoustic Profile -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Acoustic Noise Profile</label>
+              <select id="search-acoustic" class="w-full text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500">
+                <option value="Collaborative">👥 Collaborative (Normal discussions)</option>
+                <option value="Silent">🎧 Silent (Individual quiet study)</option>
+                <option value="Amplified">📢 Amplified (Auditorium / Speakers)</option>
+              </select>
+            </div>
+
+            <!-- Search Action Button -->
+            <div class="sm:col-span-2 lg:col-span-4 flex justify-end gap-3 pt-1">
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Search Matching Rooms</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Available Rooms Section -->
+        <div id="search-results-section" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 id="search-results-title" class="text-base font-bold text-white">Available Rooms</h3>
+            <span id="search-results-count" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">0 found</span>
+          </div>
+
+          <!-- Rooms Grid Container -->
+          <div id="available-rooms-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- AI Smart Slot Suggester (scikit-learn ML Regression Fallback Panel) -->
+        <div id="ml-suggester-panel" class="hidden glass-card rounded-2xl p-5 border-2 border-indigo-500/40 glow-indigo space-y-4">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 text-white flex items-center justify-center text-lg shadow-md shadow-indigo-500/30">
+                <i class="fa-solid fa-brain"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-base font-bold text-white">AI Smart Slot Suggester</h3>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase font-mono">Ridge Regression</span>
+                </div>
+                <p class="text-xs text-slate-400">0 rooms free in your exact timeframe. The ML model analyzed campus traffic patterns & suggested optimal alternative slots:</p>
+              </div>
+            </div>
+
+            <button onclick="joinStandbyForCurrentSearch()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-people-arrows"></i>
+              <span>Join Standby Waitlist</span>
+            </button>
+          </div>
+
+          <!-- Suggested Slots Grid -->
+          <div id="ml-slots-grid" class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-2">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- VIEW 3: ADMIN PORTAL (Left Sidebar + Views) -->
+    <!-- ============================================================ -->
+    <section id="view-admin" class="hidden flex-1 flex flex-col md:flex-row max-w-7xl mx-auto w-full">
+      
+      <!-- Admin Sidebar -->
+      <aside class="w-full md:w-64 glass-card border-r border-darkBorder md:min-h-[calc(100vh-4rem)] p-4 flex flex-col justify-between shrink-0">
+        <div class="space-y-6">
+          
+          <!-- Admin Profile Widget -->
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+            <img id="admin-sidebar-photo" src="" alt="Admin" class="w-10 h-10 rounded-xl object-cover ring-1 ring-purple-500/40 bg-slate-800">
+            <div class="truncate">
+              <div id="admin-sidebar-name" class="text-xs font-bold text-white truncate">Admin</div>
+              <div class="text-[10px] font-mono text-purple-400 font-semibold uppercase">Faculty Admin</div>
+            </div>
+          </div>
+
+          <!-- Sidebar Nav Items (Exact 4 requirements: Dashboard, Pending Request, Profile, Sign Out) -->
+          <nav class="space-y-1">
+            
+            <!-- 1. Dashboard -->
+            <button id="admin-nav-dashboard" onclick="switchAdminTab('dashboard')" class="admin-nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm">
+              <span class="flex items-center gap-2.5">
+                <i class="fa-solid fa-chart-line text-sm text-indigo-200"></i>
+                <span>Dashboard</span>
+              </span>
+            </button>
+
+            <!-- 2. Pending Request -->
+            <button id="admin-nav-pending" onclick="switchAdminTab('pending')" class="admin-nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+              <span class="flex items-center gap-2.5">
+                <i class="fa-solid fa-bell-concierge text-sm"></i>
+                <span>Pending Requests</span>
+              </span>
+              <span id="admin-pending-count-badge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">0</span>
+            </button>
+
+            <!-- 3. Profile -->
+            <button id="admin-nav-profile" onclick="switchAdminTab('profile')" class="admin-nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white hover:bg-slate-800/60">
+              <span class="flex items-center gap-2.5">
+                <i class="fa-solid fa-id-badge text-sm"></i>
+                <span>Profile</span>
+              </span>
+            </button>
+
+            <!-- 4. Sign Out -->
+            <button onclick="handleLogout()" class="admin-nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-rose-400 hover:bg-rose-950/20">
+              <span class="flex items-center gap-2.5">
+                <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
+                <span>Sign Out</span>
+              </span>
+            </button>
+
+          </nav>
+        </div>
+
+        <!-- Sidebar Footer Status -->
+        <div class="pt-4 border-t border-slate-800 text-[11px] text-slate-500 text-center">
+          <div>Autonomous Lifespan Worker</div>
+          <div class="text-emerald-400 font-mono mt-0.5"><i class="fa-solid fa-check text-[9px] mr-1"></i>Scheduler (60s) Online</div>
+        </div>
+      </aside>
+
+      <!-- Admin Main Content Area -->
+      <div class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-y-auto">
+
+        <!-- ======================================================== -->
+        <!-- ADMIN TAB 1: DASHBOARD (History of Allotted Rooms) -->
+        <!-- ======================================================== -->
+        <div id="admin-tab-dashboard" class="space-y-6">
+          
+          <!-- Metrics Overview Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="glass-card p-4 rounded-2xl border border-slate-700/70">
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Allotted Rooms</div>
+              <div id="metric-total-allotted" class="text-2xl font-black text-white font-mono mt-1">0</div>
+              <div class="text-[10px] text-indigo-400 mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Booked / Scanned / Expired</div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl border border-slate-700/70">
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Scanned Check-ins</div>
+              <div id="metric-scanned-count" class="text-2xl font-black text-emerald-400 font-mono mt-1">0</div>
+              <div class="text-[10px] text-emerald-400 mt-1"><i class="fa-solid fa-qrcode mr-1"></i>Verified via QR Portal</div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl border border-slate-700/70">
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Auto-Expired (No-shows)</div>
+              <div id="metric-expired-count" class="text-2xl font-black text-rose-400 font-mono mt-1">0</div>
+              <div class="text-[10px] text-rose-400 mt-1"><i class="fa-solid fa-user-xmark mr-1"></i>Released at 15m Window</div>
+            </div>
+            <div class="glass-card p-4 rounded-2xl border border-slate-700/70">
+              <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pending Decisions</div>
+              <div id="metric-pending-count" class="text-2xl font-black text-amber-400 font-mono mt-1">0</div>
+              <div class="text-[10px] text-amber-400 mt-1"><i class="fa-solid fa-hourglass mr-1"></i>Awaiting Faculty Approval</div>
+            </div>
+          </div>
+
+          <!-- Allotted Rooms Table -->
+          <div class="glass-card rounded-2xl p-5 border border-slate-700/80 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-table-list text-indigo-400"></i>
+                  <span>History of Allotted & Processed Rooms</span>
+                </h3>
+                <p class="text-xs text-slate-400">Real-time audit log of campus spaces processed across all academic departments</p>
+              </div>
+              <button onclick="loadAdminDashboardData()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate text-xs"></i>
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-800 text-slate-400 uppercase text-[10px] font-bold">
+                    <th class="py-3 px-3">Room & Acoustic</th>
+                    <th class="py-3 px-3">Student Requester</th>
+                    <th class="py-3 px-3">Purpose</th>
+                    <th class="py-3 px-3">Timeframe</th>
+                    <th class="py-3 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="allotted-history-tbody" class="divide-y divide-slate-800/60 text-slate-300">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- ADMIN TAB 2: PENDING REQUESTS PAGE -->
+        <!-- ======================================================== -->
+        <div id="admin-tab-pending" class="hidden space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-inbox text-amber-400"></i>
+                <span>Pending Permission Requests</span>
+              </h3>
+              <p class="text-xs text-slate-400">Review student applications. Approving locks the room, increments student bookings, and reveals the QR check-in portal.</p>
+            </div>
+            <button onclick="loadAdminPendingRequests()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all flex items-center gap-1.5">
+              <i class="fa-solid fa-rotate text-xs"></i>
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          <!-- Pending Cards Grid -->
+          <div id="pending-requests-container" class="space-y-3.5">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- ADMIN TAB 3: ADMIN PROFILE PAGE -->
+        <!-- ======================================================== -->
+        <div id="admin-tab-profile" class="hidden space-y-6">
+          <div class="glass-card rounded-2xl p-6 border border-slate-700/80 max-w-2xl space-y-6">
+            
+            <div class="flex items-center gap-4">
+              <img id="admin-profile-photo" src="" alt="Admin" class="w-16 h-16 rounded-2xl object-cover ring-2 ring-purple-500/50 bg-slate-800">
+              <div>
+                <h3 id="admin-profile-name" class="text-lg font-bold text-white">Admin Name</h3>
+                <p id="admin-profile-email" class="text-xs text-slate-400">admin@campus.edu</p>
+                <span class="mt-1.5 inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase font-mono">Faculty Administrator</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+              <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Personal Bookings</div>
+                <div id="admin-profile-personal-bookings" class="text-2xl font-black text-white font-mono mt-1">0</div>
+              </div>
+              <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total Requests Processed</div>
+                <div id="admin-profile-processed-count" class="text-2xl font-black text-purple-400 font-mono mt-1">0</div>
+              </div>
+            </div>
+
+            <div class="space-y-2 pt-2 text-xs text-slate-400">
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span>Platform Version</span>
+                <span class="font-mono text-slate-200">v2.0.0 (FastAPI + SQLAlchemy)</span>
+              </div>
+              <div class="flex justify-between py-1 border-b border-slate-800/60">
+                <span>AI Slot Suggester</span>
+                <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle text-[8px] mr-1"></i>scikit-learn Ridge Calibrated</span>
+              </div>
+              <div class="flex justify-between py-1">
+                <span>Background Worker</span>
+                <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle text-[8px] mr-1"></i>APScheduler (60s cycle) Active</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- BOOKING CONFIRMATION MODAL -->
+  <!-- ============================================================== -->
+  <div id="booking-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="max-w-md w-full glass-card p-6 rounded-2xl border border-slate-700 shadow-2xl relative space-y-4">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-calendar-check text-indigo-400"></i>
+          <span>Confirm Room Reservation</span>
+        </h3>
+        <button onclick="closeBookingModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <!-- Room Summary Card -->
+      <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs space-y-1">
+        <div class="font-bold text-white text-sm" id="modal-space-name">Room Name</div>
+        <div class="text-slate-400 flex items-center gap-3">
+          <span id="modal-space-capacity"><i class="fa-solid fa-users mr-1"></i>Max: 20</span>
+          <span id="modal-space-acoustic"><i class="fa-solid fa-volume-high mr-1"></i>Collaborative</span>
+        </div>
+      </div>
+
+      <!-- Form Inputs -->
+      <form onsubmit="submitBookingRequest(event)" class="space-y-3.5 text-xs">
+        <input type="hidden" id="modal-space-id">
+        <input type="hidden" id="modal-start-time">
+        <input type="hidden" id="modal-end-time">
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Time Window</label>
+          <div id="modal-time-display" class="font-mono text-slate-300 p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+            2026-10-30 14:00 - 16:00
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Accompanying Attendees (Excluding You)</label>
+          <input type="number" id="modal-accompanying" min="0" max="100" value="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono focus:outline-none focus:border-indigo-500" required>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Purpose of Use</label>
+          <textarea id="modal-purpose" rows="3" placeholder="Describe the project, meeting, or study topic..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" required>AI Hackathon Group Brainstorming & Demo Build</textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeBookingModal()" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white font-semibold">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-md shadow-indigo-600/30">
+            Submit Reservation Request
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- BUILT-IN HACKATHON JUDGE DEMO TOOLBAR (Floating Bottom-Right) -->
+  <!-- ============================================================== -->
+  <div id="judge-toolbar" class="fixed bottom-4 right-4 z-40 flex flex-col items-end">
+    
+    <!-- Expanded Toolbar Controls -->
+    <div id="judge-toolbar-content" class="hidden mb-2 glass-card p-3 rounded-2xl border-2 border-indigo-500/50 glow-indigo shadow-2xl space-y-2 w-72 text-xs">
+      <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
+        <span class="font-extrabold text-white flex items-center gap-1.5">
+          <i class="fa-solid fa-sliders text-indigo-400"></i>
+          <span>Judge Demo Controls</span>
+        </span>
+        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">Live API</span>
+      </div>
+
+      <p class="text-[11px] text-slate-400">Trigger simulated timeline events without waiting real-world clock time:</p>
+
+      <!-- Button 1: Fast-Forward Expiration & Rotation -->
+      <button onclick="triggerDemoMaintenance()" class="w-full py-2 px-2.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold text-left flex items-center gap-2 transition-all">
+        <i class="fa-solid fa-forward-step text-sm"></i>
+        <div>
+          <div class="text-[11px] font-bold leading-tight">⚡ Fast-Forward 15m Auto-Release</div>
+          <div class="text-[9px] text-amber-400/80 font-normal">Expires no-shows & rotates 3m standby</div>
+        </div>
+      </button>
+
+      <!-- Button 2: Reset Database -->
+      <button onclick="triggerDemoReset()" class="w-full py-2 px-2.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 font-bold text-left flex items-center gap-2 transition-all">
+        <i class="fa-solid fa-arrows-rotate text-sm"></i>
+        <div>
+          <div class="text-[11px] font-bold leading-tight">🔄 Reset Demo Database</div>
+          <div class="text-[9px] text-rose-400/80 font-normal">Restores 6 rooms, Agrim, Priya, Sarah</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Toggle Button -->
+    <button onclick="toggleJudgeToolbar()" class="px-3.5 py-2 rounded-full glass-card border border-indigo-500/50 text-indigo-300 hover:text-white text-xs font-bold shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center gap-2">
+      <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
+      <span>Demo Controls</span>
+      <i id="judge-toolbar-caret" class="fa-solid fa-chevron-up text-[10px]"></i>
+    </button>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- FRONTEND APPLICATION JAVASCRIPT (State, API, & Logic) -->
+  <!-- ============================================================== -->
+  <script>
+    // Global Application State
+    const state = {
+      token: localStorage.getItem('access_token') || null,
+      user: JSON.parse(localStorage.getItem('user_profile') || 'null'),
+      activeTab: 'dashboard',       // 'dashboard' or 'search' (Student)
+      adminTab: 'dashboard',        // 'dashboard', 'pending', 'profile' (Admin)
+      dashboardData: null,
+      pendingRequests: [],
+      allottedHistory: [],
+      activeTimers: [],
+      pollInterval: null,
+      standbyInterval: null,
+      qrInterval: null,
+    };
+
+    // ==============================================================
+    // INITIALIZATION & LIFECYCLE
+    // ==============================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      initDateTimeDefaults();
+      if (state.token && state.user) {
+        routeToPortal();
+      } else {
+        showLoginView();
+      }
+    });
+
+    function initDateTimeDefaults() {
+      const now = new Date();
+      // Round up to next full hour
+      now.setHours(now.getHours() + 1, 0, 0, 0);
+      const startStr = formatDateTimeLocal(now);
+      
+      const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      const endStr = formatDateTimeLocal(end);
+
+      const startInput = document.getElementById('search-start-time');
+      const endInput = document.getElementById('search-end-time');
+      if (startInput) startInput.value = startStr;
+      if (endInput) endInput.value = endStr;
+    }
+
+    function formatDateTimeLocal(d) {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    // ==============================================================
+    // ROUTING & VIEW SWITCHING
+    // ==============================================================
+    function routeToPortal() {
+      if (!state.user) {
+        showLoginView();
+        return;
+      }
+      updateHeaderUserPill();
+      if (state.user.role === 'admin') {
+        showAdminPortal();
+      } else {
+        showStudentPortal();
+      }
+    }
+
+    function showLoginView() {
+      stopPolling();
+      document.getElementById('view-login').classList.remove('hidden');
+      document.getElementById('view-student').classList.add('hidden');
+      document.getElementById('view-admin').classList.add('hidden');
+      document.getElementById('student-nav-tabs').classList.add('hidden');
+      document.getElementById('user-profile-pill').classList.add('hidden');
+      document.getElementById('header-login-btn').classList.remove('hidden');
+    }
+
+    function showStudentPortal() {
+      document.getElementById('view-login').classList.add('hidden');
+      document.getElementById('view-student').classList.remove('hidden');
+      document.getElementById('view-admin').classList.add('hidden');
+      document.getElementById('student-nav-tabs').classList.remove('hidden');
+      document.getElementById('user-profile-pill').classList.remove('hidden');
+      document.getElementById('user-profile-pill').classList.add('flex');
+      document.getElementById('header-login-btn').classList.add('hidden');
+
+      switchStudentTab(state.activeTab || 'dashboard');
+      loadStudentDashboardData();
+      startPolling(5000, loadStudentDashboardData);
+    }
+
+    function showAdminPortal() {
+      document.getElementById('view-login').classList.add('hidden');
+      document.getElementById('view-student').classList.add('hidden');
+      document.getElementById('view-admin').classList.remove('hidden');
+      document.getElementById('view-admin').classList.add('flex');
+      document.getElementById('student-nav-tabs').classList.add('hidden');
+      document.getElementById('user-profile-pill').classList.remove('hidden');
+      document.getElementById('user-profile-pill').classList.add('flex');
+      document.getElementById('header-login-btn').classList.add('hidden');
+
+      switchAdminTab(state.adminTab || 'dashboard');
+      loadAdminBadgeCounts();
+      startPolling(5000, () => {
+        if (state.adminTab === 'pending') loadAdminPendingRequests();
+        if (state.adminTab === 'dashboard') loadAdminDashboardData();
+        loadAdminBadgeCounts();
+      });
+    }
+
+    function switchStudentTab(tab) {
+      state.activeTab = tab;
+      const dashBtn = document.getElementById('tab-btn-dashboard');
+      const searchBtn = document.getElementById('tab-btn-search');
+      const dashView = document.getElementById('student-tab-dashboard');
+      const searchView = document.getElementById('student-tab-search');
+
+      if (tab === 'dashboard') {
+        dashBtn.className = 'px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150 text-white bg-indigo-600 shadow-sm';
+        searchBtn.className = 'px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150 text-slate-300 hover:text-white hover:bg-slate-800/60';
+        dashView.classList.remove('hidden');
+        searchView.classList.add('hidden');
+        loadStudentDashboardData();
+      } else {
+        searchBtn.className = 'px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150 text-white bg-indigo-600 shadow-sm';
+        dashBtn.className = 'px-4 py-1.5 text-sm font-semibold rounded-lg transition-all duration-150 text-slate-300 hover:text-white hover:bg-slate-800/60';
+        searchView.classList.remove('hidden');
+        dashView.classList.add('hidden');
+      }
+    }
+
+    function switchAdminTab(tab) {
+      state.adminTab = tab;
+      const tabs = ['dashboard', 'pending', 'profile'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`admin-nav-${t}`);
+        const view = document.getElementById(`admin-tab-${t}`);
+        if (t === tab) {
+          btn.className = 'admin-nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm';
+          view.classList.remove('hidden');
+        } else {
+          btn.className = 'admin-nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white hover:bg-slate-800/60';
+          view.classList.add('hidden');
+        }
+      });
+
+      if (tab === 'dashboard') loadAdminDashboardData();
+      if (tab === 'pending') loadAdminPendingRequests();
+      if (tab === 'profile') loadAdminProfileData();
+    }
+
+    function navigateHome() {
+      if (!state.user) {
+        showLoginView();
+      } else if (state.user.role === 'admin') {
+        switchAdminTab('dashboard');
+      } else {
+        switchStudentTab('dashboard');
+      }
+    }
+
+    // ==============================================================
+    // AUTHENTICATION HANDLERS
+    // ==============================================================
+    async function loginAsDemo(email, role, name) {
+      try {
+        const res = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dev_bypass_email: email,
+            dev_role: role,
+            name: name
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Authentication failed');
+        }
+
+        const data = await res.json();
+        saveAuthSession(data.access_token, data.user);
+        showToast(`Signed in as ${data.user.name}`, 'success');
+        routeToPortal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleCustomLogin(e) {
+      e.preventDefault();
+      const name = document.getElementById('custom-name-input').value.trim();
+      const email = document.getElementById('custom-email-input').value.trim();
+      const role = document.getElementById('custom-role-input').value;
+      if (!email || !name) return;
+      await loginAsDemo(email, role, name);
+    }
+
+    function switchPersona(personaKey) {
+      if (personaKey === 'agrim') {
+        loginAsDemo('agrimgoel14@gmail.com', 'student', 'Agrim Goel');
+      } else if (personaKey === 'priya') {
+        loginAsDemo('priya.sharma@campus.edu', 'student', 'Priya Sharma');
+      } else if (personaKey === 'alex') {
+        loginAsDemo('alex.chen@campus.edu', 'student', 'Alex Chen');
+      } else if (personaKey === 'admin') {
+        loginAsDemo('admin@campus.edu', 'admin', 'Dr. Sarah Connor (Faculty Admin)');
+      }
+    }
+
+    function saveAuthSession(token, user) {
+      state.token = token;
+      state.user = user;
+      localStorage.setItem('access_token', token);
+      localStorage.setItem('user_profile', JSON.stringify(user));
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch (e) {
+        // Ignore network failure on logout
+      }
+      state.token = null;
+      state.user = null;
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_profile');
+      showToast('Logged out successfully', 'info');
+      showLoginView();
+    }
+
+    function updateHeaderUserPill() {
+      if (!state.user) return;
+      document.getElementById('header-avatar').src = state.user.photo_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${state.user.email}`;
+      document.getElementById('header-name').textContent = state.user.name;
+      const roleBadge = document.getElementById('header-role-badge');
+      roleBadge.textContent = state.user.role;
+      roleBadge.className = state.user.role === 'admin' 
+        ? 'text-[10px] text-purple-400 font-mono font-bold'
+        : 'text-[10px] text-indigo-400 font-mono font-bold';
+    }
+
+    // ==============================================================
+    // STUDENT PORTAL LOGIC & APIS
+    // ==============================================================
+    async function loadStudentDashboardData() {
+      if (!state.token || !state.user || state.user.role !== 'student') return;
+
+      try {
+        const res = await fetch('/api/user/dashboard', {
+          headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+
+        if (res.status === 401) {
+          handleLogout();
+          return;
+        }
+
+        if (!res.ok) throw new Error('Failed to load dashboard data');
+
+        const data = await res.json();
+        state.dashboardData = data;
+
+        // Update profile widget
+        document.getElementById('student-profile-photo').src = data.user.photo_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${data.user.email}`;
+        document.getElementById('student-profile-name').textContent = data.user.name;
+        document.getElementById('student-profile-email').textContent = data.user.email;
+        document.getElementById('student-profile-id').textContent = data.user.id;
+        document.getElementById('student-total-bookings').textContent = data.user.total_bookings;
+
+        // Render Active Booking & QR Portal
+        renderActiveBookingPortal(data.active_bookings);
+
+        // Check for Standby Flash Claim opportunity
+        checkStandbyFlashClaim(data.standby_waitlists);
+
+        // Render Booking History
+        renderHistoryCards(data.history_by_status);
+
+      } catch (err) {
+        console.error('Error fetching dashboard:', err);
+      }
+    }
+
+    function checkStandbyFlashClaim(waitlists) {
+      const banner = document.getElementById('standby-flash-claim-banner');
+      if (!waitlists || waitlists.length === 0) {
+        banner.classList.add('hidden');
+        if (state.standbyInterval) clearInterval(state.standbyInterval);
+        return;
+      }
+
+      // Check if any waitlist entry has an active flash_claim_expires_at
+      const now = new Date();
+      const activeClaim = waitlists.find(w => w.flash_claim_expires_at && new Date(w.flash_claim_expires_at) > now);
+
+      if (activeClaim) {
+        banner.classList.remove('hidden');
+        const claimEnd = new Date(activeClaim.flash_claim_expires_at);
+        document.getElementById('claim-flash-room-btn').dataset.waitlistId = activeClaim.id;
+
+        if (state.standbyInterval) clearInterval(state.standbyInterval);
+        state.standbyInterval = setInterval(() => {
+          const current = new Date();
+          const diffMs = claimEnd - current;
+          if (diffMs <= 0) {
+            clearInterval(state.standbyInterval);
+            banner.classList.add('hidden');
+            loadStudentDashboardData();
+          } else {
+            const m = Math.floor(diffMs / 60000);
+            const s = Math.floor((diffMs % 60000) / 1000);
+            document.getElementById('standby-timer-display').textContent = 
+              `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+          }
+        }, 1000);
+      } else {
+        banner.classList.add('hidden');
+        if (state.standbyInterval) clearInterval(state.standbyInterval);
+      }
+    }
+
+    async function executeFlashClaim() {
+      const btn = document.getElementById('claim-flash-room-btn');
+      const waitlistId = btn.dataset.waitlistId;
+      if (!waitlistId) return;
+
+      try {
+        const res = await fetch(`/api/standby/${waitlistId}/flash-claim`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to claim room');
+        }
+
+        const data = await res.json();
+        showToast('Room successfully claimed and booked!', 'success');
+        document.getElementById('standby-flash-claim-banner').classList.add('hidden');
+        loadStudentDashboardData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderActiveBookingPortal(activeBookings) {
+      const container = document.getElementById('active-booking-container');
+      container.innerHTML = '';
+
+      if (!activeBookings || activeBookings.length === 0) {
+        return;
+      }
+
+      // Find prioritized booking: first Booked, or Pending_Permission
+      const booked = activeBookings.find(b => b.status === 'Booked');
+      const pending = activeBookings.find(b => b.status === 'Pending_Permission');
+      const primary = booked || pending || activeBookings[0];
+
+      if (primary.status === 'Booked') {
+        // Render 15-Minute QR Check-In Card
+        const card = document.createElement('div');
+        card.className = 'glass-card rounded-2xl p-6 border-2 border-cyan-500/50 glow-cyan space-y-4';
+        
+        card.innerHTML = `
+          <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                  <i class="fa-solid fa-lock-open mr-1"></i>Ready For Check-In
+                </span>
+                <span class="text-xs font-mono text-slate-400">ID: ${primary.id.slice(0, 8)}</span>
+              </div>
+              <h3 class="text-lg font-extrabold text-white">${primary.space ? primary.space.name : 'Allocated Space'}</h3>
+              <p class="text-xs text-slate-300">${primary.purpose}</p>
+              <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1 font-mono">
+                <span><i class="fa-solid fa-calendar mr-1 text-slate-500"></i>${formatDateTimeDisplay(primary.start_time)} - ${formatTimeOnly(primary.end_time)}</span>
+                <span><i class="fa-solid fa-users mr-1 text-slate-500"></i>Attendees: 1 + ${primary.accompanying_count}</span>
+              </div>
+            </div>
+
+            <!-- QR Code & Scanner Interaction -->
+            <div class="flex items-center gap-4 bg-slate-900/90 p-4 rounded-xl border border-slate-800 shrink-0">
+              <div id="qrcode-canvas" class="w-24 h-24 bg-white p-1.5 rounded-lg shrink-0 flex items-center justify-center"></div>
+              <div class="space-y-2">
+                <div class="text-[10px] uppercase font-mono text-slate-400">15-Min Check-In Timer</div>
+                <div id="qr-countdown-timer" class="font-mono text-xl font-black text-cyan-400">15:00</div>
+                <button onclick="scanQRCheckIn('${primary.id}')" class="px-3.5 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-cyan-500/30 flex items-center gap-1.5">
+                  <i class="fa-solid fa-qrcode"></i>
+                  <span>Simulate Physical Scan</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+
+        // Generate QR code
+        setTimeout(() => {
+          const qrElem = document.getElementById('qrcode-canvas');
+          if (qrElem) {
+            qrElem.innerHTML = '';
+            new QRCode(qrElem, {
+              text: `CAMPUS_CHECKIN:${primary.id}:${primary.user_id}`,
+              width: 84,
+              height: 84,
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.M
+            });
+          }
+        }, 50);
+
+        // Setup 15-Minute Countdown Timer
+        setupQRCountdown(primary.start_time);
+
+      } else if (primary.status === 'Pending_Permission') {
+        // Render Pending Approval Banner
+        const card = document.createElement('div');
+        card.className = 'glass-card rounded-2xl p-5 border border-amber-500/40 bg-gradient-to-r from-amber-950/30 via-slate-900/60 to-slate-900/60 flex items-center justify-between gap-4';
+        card.innerHTML = `
+          <div class="flex items-center gap-3.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg border border-amber-500/30 shrink-0">
+              <i class="fa-solid fa-hourglass-half"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">Waiting For Permission</span>
+                <span class="text-xs text-slate-400 font-mono">${primary.space ? primary.space.name : 'Space'}</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mt-0.5">Faculty Admin Review In Progress</h4>
+              <p class="text-xs text-slate-400">Dr. Sarah Connor has received your request for "${primary.purpose}". Once approved, your QR check-in portal will activate automatically.</p>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="text-xs text-indigo-400 font-mono flex items-center gap-1.5"><i class="fa-solid fa-rotate animate-spin text-[10px]"></i>Live Polling</span>
+          </div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function setupQRCountdown(startTimeStr) {
+      if (state.qrInterval) clearInterval(state.qrInterval);
+      const startTime = new Date(startTimeStr);
+      const deadline = new Date(startTime.getTime() + 15 * 60 * 1000);
+
+      const update = () => {
+        const now = new Date();
+        const diffMs = deadline - now;
+        const elem = document.getElementById('qr-countdown-timer');
+        if (!elem) return;
+
+        if (diffMs <= 0) {
+          elem.textContent = 'Expired';
+          elem.className = 'font-mono text-xl font-black text-rose-400';
+          clearInterval(state.qrInterval);
+          loadStudentDashboardData();
+        } else {
+          const m = Math.floor(diffMs / 60000);
+          const s = Math.floor((diffMs % 60000) / 1000);
+          elem.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+      };
+
+      update();
+      state.qrInterval = setInterval(update, 1000);
+    }
+
+    async function scanQRCheckIn(reservationId) {
+      try {
+        const res = await fetch(`/api/bookings/${reservationId}/scan-qr`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'QR Scan Check-in failed');
+        }
+
+        const data = await res.json();
+        showToast(data.message || 'Check-in Verified! Room unlocked.', 'success');
+        loadStudentDashboardData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderHistoryCards(historyMap) {
+      const container = document.getElementById('history-cards-container');
+      container.innerHTML = '';
+
+      let allList = [];
+      Object.keys(historyMap || {}).forEach(k => {
+        allList = allList.concat(historyMap[k]);
+      });
+
+      // Sort by start_time desc
+      allList.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
+      if (allList.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-8 text-slate-500 text-xs">
+            <i class="fa-solid fa-folder-open text-2xl mb-2 text-slate-600 block"></i>
+            No bookings recorded yet. Use the "Find & Book Space" tab to reserve a room.
+          </div>
+        `;
+        return;
+      }
+
+      allList.forEach(res => {
+        const card = document.createElement('div');
+        card.className = `p-4 rounded-xl glass-card border border-slate-700/60 space-y-2.5 history-card status-${res.status}`;
+        
+        let badgeColor = 'bg-slate-800 text-slate-400 border-slate-700';
+        let badgeIcon = 'fa-regular fa-clock';
+        if (res.status === 'Booked') {
+          badgeColor = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+          badgeIcon = 'fa-solid fa-check';
+        } else if (res.status === 'Scanned') {
+          badgeColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+          badgeIcon = 'fa-solid fa-qrcode';
+        } else if (res.status === 'Pending_Permission') {
+          badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+          badgeIcon = 'fa-solid fa-hourglass-half';
+        } else if (res.status === 'Expired') {
+          badgeColor = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+          badgeIcon = 'fa-solid fa-xmark';
+        } else if (res.status === 'Denied') {
+          badgeColor = 'bg-slate-700 text-slate-400 border-slate-600';
+          badgeIcon = 'fa-solid fa-ban';
+        }
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${badgeColor} uppercase tracking-wider flex items-center gap-1">
+              <i class="${badgeIcon}"></i>
+              ${res.status.replace('_', ' ')}
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono">${formatDateOnly(res.start_time)}</span>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-white truncate">${res.space ? res.space.name : 'Campus Room'}</div>
+            <div class="text-xs text-slate-400 line-clamp-1">${res.purpose}</div>
+          </div>
+          <div class="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span><i class="fa-regular fa-clock mr-1 text-slate-500"></i>${formatTimeOnly(res.start_time)} - ${formatTimeOnly(res.end_time)}</span>
+            <span><i class="fa-solid fa-users mr-1 text-slate-500"></i>${1 + res.accompanying_count}</span>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function filterHistory(status) {
+      document.querySelectorAll('.history-filter-btn').forEach(btn => {
+        if (btn.dataset.status === status) {
+          btn.className = 'history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 text-white';
+        } else {
+          btn.className = 'history-filter-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800 text-slate-400 hover:text-white';
+        }
+      });
+
+      document.querySelectorAll('.history-card').forEach(card => {
+        if (status === 'all' || card.classList.contains(`status-${status}`)) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    }
+
+    // ==============================================================
+    // ROOM SEARCH & ML SMART SLOT SUGGESTER
+    // ==============================================================
+    async function handleRoomSearch(e) {
+      if (e) e.preventDefault();
+      const capacity = document.getElementById('search-capacity').value;
+      const startTime = document.getElementById('search-start-time').value;
+      const endTime = document.getElementById('search-end-time').value;
+      const acoustic = document.getElementById('search-acoustic').value;
+
+      if (!startTime || !endTime) {
+        showToast('Please select valid start and end times', 'error');
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          capacity: capacity,
+          start_time: new Date(startTime).toISOString(),
+          end_time: new Date(endTime).toISOString(),
+          acoustic_profile: acoustic
+        });
+
+        const res = await fetch(`/api/rooms/search?${params.toString()}`);
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Search failed');
+        }
+
+        const data = await res.json();
+        renderSearchResults(data, { capacity, startTime, endTime, acoustic });
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderSearchResults(data, searchParams) {
+      const availableGrid = document.getElementById('available-rooms-grid');
+      const mlPanel = document.getElementById('ml-suggester-panel');
+      const countElem = document.getElementById('search-results-count');
+
+      availableGrid.innerHTML = '';
+
+      if (data.available_rooms && data.available_rooms.length > 0) {
+        countElem.textContent = `${data.available_rooms.length} room(s) free`;
+        mlPanel.classList.add('hidden');
+
+        data.available_rooms.forEach(room => {
+          const card = document.createElement('div');
+          card.className = 'glass-card glass-card-hover p-5 rounded-2xl border border-slate-700/80 flex flex-col justify-between space-y-3';
+          
+          let acousticIcon = 'fa-users';
+          let acousticColor = 'text-indigo-400 bg-indigo-500/20 border-indigo-500/30';
+          if (room.acoustic_profile === 'Silent') {
+            acousticIcon = 'fa-headphones';
+            acousticColor = 'text-cyan-400 bg-cyan-500/20 border-cyan-500/30';
+          } else if (room.acoustic_profile === 'Amplified') {
+            acousticIcon = 'fa-bullhorn';
+            acousticColor = 'text-purple-400 bg-purple-500/20 border-purple-500/30';
+          }
+
+          card.innerHTML = `
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${acousticColor} flex items-center gap-1.5">
+                  <i class="fa-solid ${acousticIcon}"></i>
+                  ${room.acoustic_profile}
+                </span>
+                <span class="text-xs font-mono font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                  <i class="fa-solid fa-users mr-1 text-slate-500"></i>Cap: ${room.capacity}
+                </span>
+              </div>
+              <h4 class="text-base font-extrabold text-white">${room.name}</h4>
+              <p class="text-xs text-slate-400">Conflict-free mathematical slot confirmed across all active campus bookings.</p>
+            </div>
+            
+            <button onclick="openBookingModal('${room.id}', '${escapeHtml(room.name)}', ${room.capacity}, '${room.acoustic_profile}', '${searchParams.startTime}', '${searchParams.endTime}')" class="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2">
+              <i class="fa-solid fa-calendar-plus"></i>
+              <span>Select & Book Room</span>
+            </button>
+          `;
+          availableGrid.appendChild(card);
+        });
+
+      } else {
+        // 0 rooms available -> Render ML smart slot suggestions
+        countElem.textContent = '0 rooms available';
+        availableGrid.innerHTML = `
+          <div class="col-span-full py-6 text-center text-slate-400 text-xs glass-card rounded-xl border border-slate-800">
+            <i class="fa-solid fa-circle-exclamation text-amber-400 text-xl mb-1.5 block"></i>
+            No conflict-free spaces match this exact timeframe. See AI Smart Slot Suggester below for peak-optimized alternatives.
+          </div>
+        `;
+
+        if (data.ml_suggested_slots && data.ml_suggested_slots.length > 0) {
+          renderMLSuggestions(data.ml_suggested_slots, searchParams);
+        }
+      }
+    }
+
+    function renderMLSuggestions(slots, searchParams) {
+      const mlPanel = document.getElementById('ml-suggester-panel');
+      const grid = document.getElementById('ml-slots-grid');
+      mlPanel.classList.remove('hidden');
+      grid.innerHTML = '';
+
+      slots.forEach((slot, index) => {
+        const card = document.createElement('div');
+        card.className = 'p-4 rounded-xl bg-slate-900/90 border border-slate-700/80 space-y-3 flex flex-col justify-between';
+        
+        const probPercent = Math.round(slot.success_probability * 100);
+        let probColor = 'bg-emerald-500 text-emerald-400';
+        if (probPercent < 60) probColor = 'bg-amber-500 text-amber-400';
+
+        const room = slot.available_spaces && slot.available_spaces[0] ? slot.available_spaces[0] : null;
+
+        card.innerHTML = `
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">Option ${index + 1}</span>
+              <span class="font-mono text-slate-400 font-semibold">${probPercent}% Approval Confidence</span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div class="${probColor.split(' ')[0]} h-full rounded-full" style="width: ${probPercent}%"></div>
+            </div>
+
+            <div>
+              <div class="text-xs font-bold text-white font-mono">${formatDateTimeDisplay(slot.suggested_start)} - ${formatTimeOnly(slot.suggested_end)}</div>
+              <div class="text-[11px] text-slate-400 mt-1">${slot.reason}</div>
+            </div>
+
+            ${room ? `
+              <div class="p-2 rounded-lg bg-slate-800/60 border border-slate-700/60 text-xs">
+                <span class="text-slate-400">Available:</span> <strong class="text-slate-200">${room.name}</strong> (Cap: ${room.capacity})
+              </div>
+            ` : ''}
+          </div>
+
+          ${room ? `
+            <button onclick="openBookingModal('${room.id}', '${escapeHtml(room.name)}', ${room.capacity}, '${room.acoustic_profile}', '${formatDateTimeLocal(new Date(slot.suggested_start))}', '${formatDateTimeLocal(new Date(slot.suggested_end))}')" class="w-full py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-bolt text-indigo-200"></i>
+              <span>Book Suggested Slot</span>
+            </button>
+          ` : ''}
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    function simulatePeakCongestionSearch() {
+      // In order to simulate peak congestion, set capacity high or pick a congested time
+      document.getElementById('search-capacity').value = 95;
+      document.getElementById('search-acoustic').value = 'Collaborative';
+      handleRoomSearch();
+    }
+
+    async function joinStandbyForCurrentSearch() {
+      const startTime = document.getElementById('search-start-time').value;
+      const endTime = document.getElementById('search-end-time').value;
+      if (!startTime || !endTime) return;
+
+      // Pick the first available campus room ID or fetch spaces
+      try {
+        const spacesRes = await fetch('/api/spaces');
+        const spaces = await spacesRes.json();
+        if (!spaces || spaces.length === 0) throw new Error('No spaces found');
+        const targetSpace = spaces[0];
+
+        const res = await fetch('/api/standby/join', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${state.token}`
+          },
+          body: JSON.stringify({
+            space_id: targetSpace.id,
+            requested_start: new Date(startTime).toISOString(),
+            requested_end: new Date(endTime).toISOString()
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Could not join standby waitlist');
+        }
+
+        showToast(`Joined Standby Waitlist for ${targetSpace.name}! You will receive a 3-minute flash claim if released.`, 'success');
+        switchStudentTab('dashboard');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ==============================================================
+    // BOOKING SUBMISSION MODAL
+    // ==============================================================
+    function openBookingModal(spaceId, spaceName, capacity, acoustic, startStr, endStr) {
+      document.getElementById('modal-space-id').value = spaceId;
+      document.getElementById('modal-space-name').textContent = spaceName;
+      document.getElementById('modal-space-capacity').innerHTML = `<i class="fa-solid fa-users mr-1"></i>Max: ${capacity}`;
+      document.getElementById('modal-space-acoustic').innerHTML = `<i class="fa-solid fa-volume-high mr-1"></i>${acoustic}`;
+      document.getElementById('modal-start-time').value = startStr;
+      document.getElementById('modal-end-time').value = endStr;
+      document.getElementById('modal-time-display').textContent = `${startStr.replace('T', ' ')}  ➔  ${endStr.replace('T', ' ')}`;
+
+      document.getElementById('booking-modal').classList.remove('hidden');
+    }
+
+    function closeBookingModal() {
+      document.getElementById('booking-modal').classList.add('hidden');
+    }
+
+    async function submitBookingRequest(e) {
+      e.preventDefault();
+      const spaceId = document.getElementById('modal-space-id').value;
+      const startTime = document.getElementById('modal-start-time').value;
+      const endTime = document.getElementById('modal-end-time').value;
+      const accompanying = parseInt(document.getElementById('modal-accompanying').value, 10) || 0;
+      const purpose = document.getElementById('modal-purpose').value.trim();
+
+      try {
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${state.token}`
+          },
+          body: JSON.stringify({
+            space_id: spaceId,
+            start_time: new Date(startTime).toISOString(),
+            end_time: new Date(endTime).toISOString(),
+            accompanying_count: accompanying,
+            purpose: purpose
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to submit reservation');
+        }
+
+        const data = await res.json();
+        showToast('Reservation submitted! Waiting for Faculty Admin approval.', 'success');
+        closeBookingModal();
+        switchStudentTab('dashboard');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ==============================================================
+    // ADMIN PORTAL LOGIC & APIS
+    // ==============================================================
+    async function loadAdminBadgeCounts() {
+      if (!state.token || !state.user || state.user.role !== 'admin') return;
+      try {
+        const res = await fetch('/api/admin/pending-requests', {
+          headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+        if (res.ok) {
+          const list = await res.json();
+          const badge = document.getElementById('admin-pending-count-badge');
+          if (badge) badge.textContent = list.length;
+          const metricPending = document.getElementById('metric-pending-count');
+          if (metricPending) metricPending.textContent = list.length;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    async function loadAdminDashboardData() {
+      if (!state.token || !state.user || state.user.role !== 'admin') return;
+
+      try {
+        const res = await fetch('/api/admin/dashboard/allotted-history', {
+          headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+
+        if (!res.ok) throw new Error('Failed to load allotted history');
+        const history = await res.json();
+        state.allottedHistory = history;
+
+        // Calculate overview counts
+        let bookedCount = 0;
+        let scannedCount = 0;
+        let expiredCount = 0;
+
+        history.forEach(h => {
+          if (h.status === 'Booked') bookedCount++;
+          if (h.status === 'Scanned') scannedCount++;
+          if (h.status === 'Expired') expiredCount++;
+        });
+
+        document.getElementById('metric-total-allotted').textContent = history.length;
+        document.getElementById('metric-scanned-count').textContent = scannedCount;
+        document.getElementById('metric-expired-count').textContent = expiredCount;
+
+        // Render table
+        const tbody = document.getElementById('allotted-history-tbody');
+        tbody.innerHTML = '';
+
+        if (history.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="5" class="py-8 text-center text-slate-500">No rooms processed yet.</td>
+            </tr>
+          `;
+          return;
+        }
+
+        history.forEach(item => {
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-slate-800/40 transition-colors';
+
+          let statusBadge = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+          if (item.status === 'Scanned') statusBadge = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+          if (item.status === 'Expired') statusBadge = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+
+          row.innerHTML = `
+            <td class="py-3 px-3">
+              <div class="font-bold text-white">${item.room_name}</div>
+              <div class="text-[10px] text-slate-400 font-mono">${item.acoustic_profile} • Cap ${item.capacity}</div>
+            </td>
+            <td class="py-3 px-3">
+              <div class="flex items-center gap-2">
+                <img src="${item.student_photo_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${item.student_email}`}" class="w-6 h-6 rounded-full bg-slate-700 object-cover">
+                <div>
+                  <div class="font-semibold text-slate-200">${item.student_name}</div>
+                  <div class="text-[10px] text-slate-400 font-mono">${item.student_email}</div>
+                </div>
+              </div>
+            </td>
+            <td class="py-3 px-3 max-w-[200px] truncate text-slate-300">${item.purpose}</td>
+            <td class="py-3 px-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+              ${formatDateTimeDisplay(item.start_time)} - ${formatTimeOnly(item.end_time)}
+            </td>
+            <td class="py-3 px-3">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${statusBadge} uppercase font-mono">
+                ${item.status}
+              </span>
+            </td>
+          `;
+
+          tbody.appendChild(row);
+        });
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function loadAdminPendingRequests() {
+      if (!state.token || !state.user || state.user.role !== 'admin') return;
+
+      try {
+        const res = await fetch('/api/admin/pending-requests', {
+          headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+
+        if (!res.ok) throw new Error('Failed to load pending requests');
+        const list = await res.json();
+        state.pendingRequests = list;
+
+        const badge = document.getElementById('admin-pending-count-badge');
+        if (badge) badge.textContent = list.length;
+        const metricPending = document.getElementById('metric-pending-count');
+        if (metricPending) metricPending.textContent = list.length;
+
+        const container = document.getElementById('pending-requests-container');
+        container.innerHTML = '';
+
+        if (list.length === 0) {
+          container.innerHTML = `
+            <div class="glass-card rounded-2xl p-8 text-center text-slate-500 text-xs">
+              <i class="fa-solid fa-check-circle text-emerald-400 text-3xl mb-2 block"></i>
+              No pending room requests! All applications have been reviewed.
+            </div>
+          `;
+          return;
+        }
+
+        list.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'glass-card p-5 rounded-2xl border border-slate-700/80 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4';
+
+          const student = item.user || { name: 'Student', email: 'student@campus.edu' };
+          const space = item.space || { name: 'Campus Space', capacity: 0 };
+
+          card.innerHTML = `
+            <div class="flex items-start gap-4">
+              <img src="${student.photo_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${student.email}`}" class="w-12 h-12 rounded-xl object-cover bg-slate-800 ring-1 ring-slate-700 shrink-0">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-bold text-white">${student.name}</h4>
+                  <span class="text-[10px] font-mono text-slate-400">${student.email}</span>
+                </div>
+                <div class="text-sm font-extrabold text-indigo-300">
+                  <i class="fa-solid fa-building text-xs mr-1 text-indigo-400"></i>${space.name}
+                </div>
+                <p class="text-xs text-slate-300">"${item.purpose}"</p>
+                <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-mono pt-1">
+                  <span><i class="fa-regular fa-calendar mr-1"></i>${formatDateTimeDisplay(item.start_time)} - ${formatTimeOnly(item.end_time)}</span>
+                  <span><i class="fa-solid fa-users mr-1"></i>Party: 1 + ${item.accompanying_count}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Approve & Deny Buttons -->
+            <div class="flex items-center gap-2 w-full lg:w-auto justify-end shrink-0 pt-2 lg:pt-0">
+              <button onclick="handleAdminDecision('${item.id}', 'deny')" class="px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-xs font-bold transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Deny</span>
+              </button>
+              <button onclick="handleAdminDecision('${item.id}', 'approve')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/30 flex items-center gap-1.5">
+                <i class="fa-solid fa-check"></i>
+                <span>Approve</span>
+              </button>
+            </div>
+          `;
+
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleAdminDecision(reservationId, action) {
+      try {
+        const res = await fetch(`/api/admin/requests/${reservationId}/decision`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${state.token}`
+          },
+          body: JSON.stringify({ action: action })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to process decision');
+        }
+
+        showToast(`Request ${action === 'approve' ? 'Approved & Booked' : 'Denied'}!`, action === 'approve' ? 'success' : 'info');
+        loadAdminPendingRequests();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function loadAdminProfileData() {
+      if (!state.token || !state.user || state.user.role !== 'admin') return;
+
+      try {
+        const res = await fetch('/api/admin/profile', {
+          headers: { 'Authorization': `Bearer ${state.token}` }
+        });
+
+        if (!res.ok) throw new Error('Failed to load profile');
+        const data = await res.json();
+
+        document.getElementById('admin-profile-photo').src = data.photo_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${data.email}`;
+        document.getElementById('admin-profile-name').textContent = data.name;
+        document.getElementById('admin-profile-email').textContent = data.email;
+        document.getElementById('admin-profile-personal-bookings').textContent = data.personal_bookings;
+        document.getElementById('admin-profile-processed-count').textContent = data.total_requests_processed;
+
+        document.getElementById('admin-sidebar-name').textContent = data.name;
+        document.getElementById('admin-sidebar-photo').src = data.photo_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${data.email}`;
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ==============================================================
+    // BUILT-IN HACKATHON JUDGE DEMO TOOLBAR APIS
+    // ==============================================================
+    function toggleJudgeToolbar() {
+      const content = document.getElementById('judge-toolbar-content');
+      const caret = document.getElementById('judge-toolbar-caret');
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        caret.className = 'fa-solid fa-chevron-down text-[10px]';
+      } else {
+        content.classList.add('hidden');
+        caret.className = 'fa-solid fa-chevron-up text-[10px]';
+      }
+    }
+
+    async function triggerDemoMaintenance() {
+      try {
+        const res = await fetch('/api/dev/trigger-maintenance', { method: 'POST' });
+        const data = await res.json();
+        const stats = data.stats || {};
+        showToast(`Auto-Release Triggered! Expired: ${stats.expired_reservations || 0}, Rotated Claims: ${stats.expired_claims || 0}`, 'info');
+        if (state.user && state.user.role === 'admin') {
+          loadAdminDashboardData();
+        } else {
+          loadStudentDashboardData();
+        }
+      } catch (err) {
+        showToast('Error executing maintenance cycle', 'error');
+      }
+    }
+
+    async function triggerDemoReset() {
+      try {
+        const res = await fetch('/api/dev/seed?force_reset=true', { method: 'POST' });
+        const data = await res.json();
+        showToast('Database reset! 6 spaces, Agrim, Priya, Sarah restored.', 'success');
+        if (state.user && state.user.role === 'admin') {
+          loadAdminDashboardData();
+        } else {
+          loadStudentDashboardData();
+        }
+      } catch (err) {
+        showToast('Error resetting database', 'error');
+      }
+    }
+
+    // ==============================================================
+    // POLLING & TIMERS UTILITY
+    // ==============================================================
+    function startPolling(intervalMs, fn) {
+      stopPolling();
+      state.pollInterval = setInterval(fn, intervalMs);
+    }
+
+    function stopPolling() {
+      if (state.pollInterval) {
+        clearInterval(state.pollInterval);
+        state.pollInterval = null;
+      }
+    }
+
+    // ==============================================================
+    // UI TOASTS & FORMATTERS
+    // ==============================================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let border = 'border-indigo-500/50 bg-slate-900/90 text-white';
+      let icon = '<i class="fa-solid fa-info-circle text-indigo-400"></i>';
+      if (type === 'success') {
+        border = 'border-emerald-500/60 bg-slate-900/95 text-emerald-300';
+        icon = '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+      } else if (type === 'error') {
+        border = 'border-rose-500/60 bg-slate-900/95 text-rose-300';
+        icon = '<i class="fa-solid fa-circle-exclamation text-rose-400"></i>';
+      }
+
+      toast.className = `p-3.5 rounded-xl border ${border} shadow-2xl backdrop-blur-md flex items-center gap-3 text-xs font-semibold max-w-sm pointer-events-auto transition-all transform duration-200 translate-y-2 opacity-0`;
+      toast.innerHTML = `
+        ${icon}
+        <span class="flex-1">${message}</span>
+        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-xs"></i></button>
+      `;
+
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 4000);
+    }
+
+    function formatDateTimeDisplay(dtStr) {
+      const d = new Date(dtStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDateOnly(dtStr) {
+      const d = new Date(dtStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function formatTimeOnly(dtStr) {
+      const d = new Date(dtStr);
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/'/g, "\\'");
+    }
+  </script>
+</body>
+</html>

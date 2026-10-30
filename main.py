@@ -7,6 +7,8 @@ from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, joinedload
 
 from database import engine, Base, get_db, SessionLocal
@@ -108,7 +110,14 @@ app.include_router(auth_router)
 # =====================================================================
 # General / Health / Dev Endpoints
 # =====================================================================
-@app.get("/", tags=["Health"])
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if not os.path.exists(STATIC_DIR):
+    os.makedirs(STATIC_DIR, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/api/health", tags=["Health"])
 def health_check():
     return {
         "status": "online",
@@ -116,6 +125,15 @@ def health_check():
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "version": "2.0.0",
     }
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/app", include_in_schema=False)
+def serve_frontend():
+    index_file = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"message": "Frontend index.html not found"}
 
 
 @app.get("/api/spaces", response_model=List[SpaceResponse], tags=["Spaces"])
