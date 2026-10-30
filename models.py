@@ -119,6 +119,7 @@ class Reservation(Base):
         nullable=False,
     )
     is_urgent = Column(Boolean, default=False, nullable=False)
+    last_scanned_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="reservations")

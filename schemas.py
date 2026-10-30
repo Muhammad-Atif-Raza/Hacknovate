@@ -113,6 +113,8 @@ class ReservationResponse(BaseModel):
     id: uuid.UUID
     user_id: str
     space_id: uuid.UUID
+    space_name: Optional[str] = None
+    room_name: Optional[str] = None
     purpose: str
     accompanying_count: int
     accompanying_students: List[AccompanyingStudent] = Field(default_factory=list)
@@ -120,11 +122,23 @@ class ReservationResponse(BaseModel):
     end_time: datetime
     status: ReservationStatus
     is_urgent: bool = False
+    last_scanned_at: Optional[datetime] = None
     created_at: datetime
     space: Optional[SpaceResponse] = None
     user: Optional[UserResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def resolve_names(self) -> "ReservationResponse":
+        if not self.space_name:
+            if self.space and hasattr(self.space, "name"):
+                self.space_name = self.space.name
+            else:
+                self.space_name = None
+        if not self.room_name:
+            self.room_name = self.space_name
+        return self
 
 
 # ==========================================
@@ -198,9 +212,30 @@ class MLSuggestedSlotResponse(BaseModel):
     reason: str
 
 
+class OccupiedSpaceResponse(SpaceResponse):
+    conflicting_status: Optional[str] = "Booked"
+    current_occupant: Optional[str] = None
+    conflicting_start: Optional[datetime] = None
+    conflicting_end: Optional[datetime] = None
+
+
 class RoomSearchResponse(BaseModel):
     available_rooms: List[SpaceResponse]
+    occupied_rooms: List[OccupiedSpaceResponse] = []
     ml_suggested_slots: List[MLSuggestedSlotResponse] = []
+
+
+class AIParsedBookingRequest(BaseModel):
+    prompt: str
+
+
+class AIParsedBookingResponse(BaseModel):
+    capacity: int = 1
+    acoustic_profile: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    purpose: Optional[str] = None
+    summary: str
 
 
 # ==========================================

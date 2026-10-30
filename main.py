@@ -25,6 +25,7 @@ from models import (
 from schemas import (
     UserResponse,
     SpaceResponse,
+    OccupiedSpaceResponse,
     ReservationCreate,
     ReservationResponse,
     StandbyJoinRequest,
@@ -35,6 +36,8 @@ from schemas import (
     AdminHistoryItemResponse,
     AdminProfileResponse,
     QRScanResponse,
+    AIParsedBookingRequest,
+    AIParsedBookingResponse,
 )
 from auth import auth_router, get_current_user, require_admin
 from background_tasks import (
@@ -79,6 +82,11 @@ async def lifespan(app: FastAPI):
                 pass
             try:
                 conn.execute(text("ALTER TABLE reservations ADD COLUMN is_urgent BOOLEAN DEFAULT 0"))
+                conn.commit()
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE reservations ADD COLUMN last_scanned_at DATETIME"))
                 conn.commit()
             except Exception:
                 pass
@@ -382,7 +390,7 @@ def search_rooms(
         db.query(Space)
         .filter(
             Space.capacity >= capacity,
-            Space.acoustic_profile == acoustic_profile,
+            Space.acoustic_profile == acoustic_profile if acoustic_profile else True,
         )
     )
 
@@ -391,9 +399,48 @@ def search_rooms(
 
     available_rooms = available_rooms_query.all()
 
+    # Query matching occupied spaces for standby waitlist and urgent override
+    occupied_rooms = []
+    if busy_space_ids:
+        occ_query = (
+            db.query(Space)
+            .filter(
+                Space.capacity >= capacity,
+                Space.acoustic_profile == acoustic_profile if acoustic_profile else True,
+                Space.id.in_(busy_space_ids),
+            )
+            .all()
+        )
+        for s in occ_query:
+            conf_res = (
+                db.query(Reservation)
+                .options(joinedload(Reservation.user))
+                .filter(
+                    Reservation.space_id == s.id,
+                    Reservation.status.in_(blocking_statuses),
+                    Reservation.start_time < end_utc,
+                    Reservation.end_time > start_utc,
+                )
+                .order_by(Reservation.start_time.asc())
+                .first()
+            )
+            occupied_rooms.append(
+                OccupiedSpaceResponse(
+                    id=s.id,
+                    name=s.name,
+                    capacity=s.capacity,
+                    acoustic_profile=s.acoustic_profile,
+                    conflicting_status=conf_res.status.value if conf_res else "Booked",
+                    current_occupant=conf_res.user.name if (conf_res and conf_res.user) else None,
+                    conflicting_start=conf_res.start_time if conf_res else None,
+                    conflicting_end=conf_res.end_time if conf_res else None,
+                )
+            )
+
     if available_rooms:
         return RoomSearchResponse(
             available_rooms=[SpaceResponse.model_validate(s) for s in available_rooms],
+            occupied_rooms=occupied_rooms,
             ml_suggested_slots=[],
         )
 
@@ -413,6 +460,7 @@ def search_rooms(
 
     return RoomSearchResponse(
         available_rooms=[],
+        occupied_rooms=occupied_rooms,
         ml_suggested_slots=suggested_slots,
     )
 
@@ -480,23 +528,37 @@ def create_booking(
     )
 
     if conflicting_res:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This space is already reserved for the selected timeframe. You can join the standby waitlist!",
-        )
-
-    if payload.is_urgent:
-        if current_user.urgent_requests_used >= 3:
+        if payload.is_urgent:
+            if current_user.urgent_requests_used >= 3:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Monthly urgent request quota (3/3) exhausted.",
+                )
+            if conflicting_res.status == ReservationStatus.SCANNED:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Room is already physically checked into (Scanned) and cannot be overridden.",
+                )
+            # Allow urgent override request to be routed to Faculty/Admin Pending queue
+            current_user.urgent_requests_used += 1
+            booking_status = ReservationStatus.PENDING_PERMISSION
+        else:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Monthly urgent request quota (3/3) exhausted.",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This space is already reserved for the selected timeframe. You can join the standby waitlist!",
             )
-        current_user.urgent_requests_used += 1
-        # Urgent requests jump to the top of Admin Pending Requests queue for fast-tracking
-        booking_status = ReservationStatus.PENDING_PERMISSION
     else:
-        booking_status = ReservationStatus.BOOKED
-        current_user.total_bookings += 1
+        if payload.is_urgent:
+            if current_user.urgent_requests_used >= 3:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Monthly urgent request quota (3/3) exhausted.",
+                )
+            current_user.urgent_requests_used += 1
+            booking_status = ReservationStatus.PENDING_PERMISSION
+        else:
+            booking_status = ReservationStatus.BOOKED
+            current_user.total_bookings += 1
 
     reservation = Reservation(
         id=uuid.uuid4(),
@@ -554,6 +616,15 @@ def scan_qr_checkin(
 
     # Validate status
     if reservation.status == ReservationStatus.SCANNED:
+        total_duration_hours = (reservation.end_time - reservation.start_time).total_seconds() / 3600.0
+        if total_duration_hours > 1.0:
+            reservation.last_scanned_at = datetime.utcnow()
+            db.commit()
+            db.refresh(reservation)
+            return QRScanResponse(
+                message=f"Hourly re-verification scan confirmed for {reservation.space.name}! Occupancy maintained.",
+                reservation=ReservationResponse.model_validate(reservation),
+            )
         return QRScanResponse(
             message="Already checked into this room.",
             reservation=ReservationResponse.model_validate(reservation),
@@ -584,6 +655,7 @@ def scan_qr_checkin(
         )
 
     reservation.status = ReservationStatus.SCANNED
+    reservation.last_scanned_at = now
     db.commit()
     db.refresh(reservation)
 
@@ -852,10 +924,18 @@ def admin_make_decision(
             .first()
         )
         if conflicting:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot approve: a conflicting reservation was already booked for this space and timeframe.",
-            )
+            if reservation.is_urgent and conflicting.status == ReservationStatus.BOOKED:
+                # Urgent override: automatically displace previous un-scanned booking
+                conflicting.status = ReservationStatus.DENIED
+                c_student = db.query(User).filter(User.id == conflicting.user_id).first()
+                if c_student and c_student.total_bookings > 0:
+                    c_student.total_bookings -= 1
+                logger.info(f"Admin approved urgent reservation {reservation.id}, auto-cancelling un-scanned reservation {conflicting.id}")
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Cannot approve: a conflicting reservation was already booked for this space and timeframe.",
+                )
 
         reservation.status = ReservationStatus.BOOKED
 
@@ -1001,4 +1081,107 @@ def admin_cancel_reservation(
         payload=AdminDecisionRequest(action="cancel"),
         admin=admin,
         db=db,
+    )
+
+
+# =====================================================================
+# AI Natural Language Quick Book Engine
+# =====================================================================
+@app.post("/api/ai/parse-booking", response_model=AIParsedBookingResponse, tags=["AI Engine"])
+def ai_parse_booking(payload: AIParsedBookingRequest):
+    """
+    Parses conversational natural language booking instructions:
+    e.g. "Book a silent room for 3 people tomorrow at 3 PM for project discussion"
+    Extracts capacity, acoustic profile, start/end time, and purpose.
+    """
+    text = payload.prompt.strip().lower()
+    now = datetime.now()
+
+    # 1. Capacity Extraction
+    import re
+    cap_match = re.search(r'(?:for\s+)?(\d+)\s*(?:people|person|students?|attendees?|seats?|members?)', text)
+    if not cap_match:
+        cap_match = re.search(r'capacity\s*(?:of\s*)?(\d+)', text)
+    capacity = int(cap_match.group(1)) if cap_match else 1
+
+    # 2. Acoustic Profile Extraction
+    acoustic_profile = "Collaborative"
+    if any(k in text for k in ["silent", "quiet", "pod", "focus", "study pod"]):
+        acoustic_profile = "Silent"
+    elif any(k in text for k in ["amplified", "lecture", "audio", "mic", "seminar", "presentation", "auditorium"]):
+        acoustic_profile = "Amplified"
+    elif any(k in text for k in ["collaborative", "collab", "group", "discussion", "team", "sprint"]):
+        acoustic_profile = "Collaborative"
+
+    # 3. Date Resolution
+    target_date = now.date()
+    if "tomorrow" in text:
+        target_date = (now + timedelta(days=1)).date()
+    elif "day after tomorrow" in text:
+        target_date = (now + timedelta(days=2)).date()
+
+    # 4. Time Resolution
+    hour = None
+    minute = 0
+    # Match patterns like "3 pm", "3:30 pm", "15:00", "at 4"
+    time_match = re.search(r'(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', text)
+    if time_match:
+        h = int(time_match.group(1))
+        m = int(time_match.group(2)) if time_match.group(2) else 0
+        meridiem = time_match.group(3)
+
+        if meridiem == "pm" and h < 12:
+            h += 12
+        elif meridiem == "am" and h == 12:
+            h = 0
+        elif not meridiem and h < 7:  # Assume afternoon if 1-6 without am/pm
+            h += 12
+
+        if 0 <= h <= 23:
+            hour = h
+            minute = m
+
+    # Relative time: "in 1 hour", "in 2 hours"
+    rel_match = re.search(r'in\s+(\d+)\s*hours?', text)
+    if rel_match:
+        rel_hrs = int(rel_match.group(1))
+        future_time = now + timedelta(hours=rel_hrs)
+        target_date = future_time.date()
+        hour = future_time.hour
+        minute = future_time.minute
+
+    if hour is None:
+        # Default to upcoming hour today or tomorrow morning
+        default_next = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+        hour = default_next.hour
+        minute = 0
+
+    start_dt = datetime(target_date.year, target_date.month, target_date.day, hour, minute)
+    if start_dt < now and "tomorrow" not in text and target_date == now.date():
+        # If time has passed today, move to tomorrow
+        start_dt += timedelta(days=1)
+
+    # Duration Extraction (default 1 hour)
+    duration_match = re.search(r'for\s+(\d+)\s*(?:hours?|hrs?)', text)
+    duration_hrs = int(duration_match.group(1)) if duration_match else 1
+    end_dt = start_dt + timedelta(hours=duration_hrs)
+
+    # 5. Purpose Extraction
+    purpose = "Collaborative Academic Project Session"
+    purpose_match = re.search(r'for\s+([a-zA-Z0-9\s&]+?)(?:\s+(?:tomorrow|today|at\s+\d+|in\s+\d+)|$)', payload.prompt, re.IGNORECASE)
+    if purpose_match:
+        candidate = purpose_match.group(1).strip()
+        # Clean out common capacity/time words from purpose
+        if not re.search(r'^\d+\s*(?:people|person|students?|hours?|hrs?)$', candidate, re.IGNORECASE):
+            purpose = candidate.capitalize()
+
+    summary = f"{capacity} people • {acoustic_profile} • {start_dt.strftime('%b %d, %I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+
+    return AIParsedBookingResponse(
+        capacity=capacity,
+        acoustic_profile=acoustic_profile,
+        start_time=start_dt,
+        end_time=end_dt,
+        purpose=purpose,
+        summary=summary,
     )

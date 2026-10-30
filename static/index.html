@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <!-- HTML5 QR Camera Scanner CDN -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
   
   <style>
     :root {
@@ -1063,7 +1065,16 @@
     <!-- TAB 1: Search & Room Allocation -->
     <div id="student-tab-search" class="portal-tab-content active">
       <section class="search-card">
-        <h3 class="section-title" style="margin-bottom: 1.25rem;">🔍 Conflict-Free Room Search</h3>
+        <h3 class="section-title" style="margin-bottom: 1rem;">🔍 Conflict-Free Room Search</h3>
+
+        <!-- Natural Language AI Quick Book Bar -->
+        <div class="ai-quick-book-container" style="margin-bottom: 1.25rem; display: flex; gap: 0.65rem; background: #FFFFFF; padding: 0.45rem 0.65rem; border-radius: var(--radius-pill); border: 1.5px solid var(--border); box-shadow: var(--shadow-sm); align-items: center;">
+          <span style="font-size: 1.15rem; margin-left: 0.5rem;">✨</span>
+          <input type="text" id="ai-quick-book-input" style="border: none; background: transparent; padding: 0.5rem 0.75rem; flex: 1; font-size: 0.88rem; outline: none; color: var(--text-primary);" placeholder="AI Quick Book: e.g., 'Book a silent room for 3 people tomorrow at 3 PM for project discussion'" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); handleAIQuickBook(); }">
+          <button type="button" class="btn-pill-dark" style="height: 38px; padding: 0 1.25rem; font-size: 0.82rem; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem;" onclick="handleAIQuickBook()" id="btn-ai-quick-book">
+            <span>Ask AI</span>
+          </button>
+        </div>
 
         <!-- Multi-error validation banner (flags ALL errors together) -->
         <div id="search-error-banner" class="validation-alert-box" style="display: none;"></div>
@@ -1107,6 +1118,21 @@
         </div>
         <div id="rooms-grid" class="rooms-grid">
           <!-- Room cards dynamically injected here -->
+        </div>
+
+        <!-- Occupied Rooms Container (Standby + Urgent Override) -->
+        <div id="occupied-rooms-section" style="display: none; margin-top: 2.25rem;">
+          <div class="section-header-row" style="margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="pill-tag tag-rose">● OCCUPIED SLOTS</span>
+              <h3 class="section-title" style="margin: 0; color: #991b1b;">Unavailable Spaces (Standby & Urgent Override)</h3>
+            </div>
+            <span class="pill-tag tag-rose" id="occupied-count-badge">0 occupied</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            These spaces have conflicting active reservations. You may join the 3-minute Standby Waitlist queue or submit an Urgent Override.
+          </p>
+          <div id="occupied-rooms-grid" class="rooms-grid"></div>
         </div>
 
         <!-- AI ML Suggester Container -->
@@ -1504,6 +1530,60 @@
     </div>
   </div>
 
+  <!-- MODAL: Camera QR Scanner -->
+  <div id="camera-scanner-modal" class="modal-overlay" onclick="handleModalOverlayClick(event, 'camera-scanner-modal')">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <button class="modal-close-btn" onclick="closeCameraScanner()">&times;</button>
+      <div style="margin-bottom: 1.25rem;">
+        <span class="pill-tag tag-blue" style="margin-bottom: 0.5rem;">📷 REAL CAMERA SCANNER</span>
+        <h3 style="font-size: 1.3rem; color: var(--text-primary); margin: 0.25rem 0;">Scan Door QR Code</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0;" id="camera-scanner-subtitle">
+          Point your device camera at the physical plaque on the room door.
+        </p>
+      </div>
+
+      <!-- Live Video Viewfinder -->
+      <div id="camera-scanner-reader" style="width: 100%; max-width: 320px; min-height: 240px; margin: 0 auto 1.25rem; border-radius: 12px; overflow: hidden; background: #000; border: 2px solid var(--border);"></div>
+
+      <div id="camera-scanner-notice" style="font-size: 0.82rem; margin-bottom: 1rem;"></div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+        <button class="btn-pill-dark" onclick="verifyQRCheckInDirectlyFallback()" style="width: 100%; font-size: 0.85rem;">
+          💻 Verify Check-In Directly (Webcam Fallback)
+        </button>
+        <button class="btn-pill-outline" onclick="closeCameraScanner()" style="width: 100%; font-size: 0.85rem;">
+          Cancel / Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Occupied Room Options (Standby or Urgent Override) -->
+  <div id="occupied-room-modal" class="modal-overlay" onclick="handleModalOverlayClick(event, 'occupied-room-modal')">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <button class="modal-close-btn" onclick="document.getElementById('occupied-room-modal').classList.remove('open')">&times;</button>
+      <div style="margin-bottom: 1.25rem;">
+        <span class="pill-tag tag-rose" style="margin-bottom: 0.5rem;">🔒 OCCUPIED FACILITY</span>
+        <h3 id="occ-modal-room-name" style="font-size: 1.3rem; color: var(--text-primary); margin: 0.25rem 0;">Room Name</h3>
+        <p id="occ-modal-details" style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.25rem 0 0;">Capacity &bull; Profile</p>
+      </div>
+      <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.5rem;">
+        This space currently has an active reservation. Choose an action below:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <button class="btn-pill-outline" style="width: 100%; font-size: 0.88rem; padding: 0.65rem;" onclick="document.getElementById('occupied-room-modal').classList.remove('open'); joinStandbyWaitlist(AppState.selectedSpace.id);">
+          ⏳ Join 3-Minute Standby Waitlist
+        </button>
+        <button class="btn-pill-dark" style="width: 100%; font-size: 0.88rem; padding: 0.65rem; background: var(--accent-rose);" onclick="document.getElementById('occupied-room-modal').classList.remove('open'); openBookingModal(AppState.selectedSpace, true);">
+          🚨 Request Urgent Override
+        </button>
+        <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; border-color: transparent;" onclick="document.getElementById('occupied-room-modal').classList.remove('open')">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-container"></div>
 
   <script>
@@ -1521,6 +1601,11 @@
       adminHistory: null,
       historyFilter: 'All'
     };
+
+    function getRoomName(res) {
+      if (!res) return 'Campus Room';
+      return res.space_name || (res.space && res.space.name) || res.room_name || 'Campus Room';
+    }
 
     function toLocalISOString(date) {
       const pad = n => String(n).padStart(2, '0');
@@ -1914,6 +1999,7 @@
       aiBox.style.display = 'none';
 
       const rooms = Array.isArray(data) ? data : (data.available_rooms || []);
+      const occupiedRooms = (!Array.isArray(data) && data.occupied_rooms) ? data.occupied_rooms : [];
       const mlSlots = (!Array.isArray(data) && data.ml_suggested_slots) ? data.ml_suggested_slots : [];
 
       badge.textContent = `${rooms.length} Spaces Available`;
@@ -1936,42 +2022,153 @@
         if (mlSlots.length > 0) {
           triggerAISlotSuggester(mlSlots);
         }
-        return;
+      } else {
+        rooms.forEach(room => {
+          let acousticTag = 'tag-neutral';
+          if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
+          if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
+          if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
+
+          const card = document.createElement('div');
+          card.className = 'room-card';
+
+          card.innerHTML = `
+            <div>
+              <div class="room-card-header">
+                <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
+                <span class="pill-badge" style="font-size: 0.75rem;">Cap: ${room.capacity} seats</span>
+              </div>
+              <h3 class="room-title">${room.name}</h3>
+              <div class="room-specs">
+                <span class="pill-tag tag-neutral">High-Speed Wi-Fi</span>
+                <span class="pill-tag tag-neutral">Smart Screen & Audio</span>
+                <span class="pill-tag tag-emerald">● Instant Allocation &bull; Auto-Approved</span>
+              </div>
+            </div>
+            <div class="room-card-footer">
+              <span style="font-size: 0.85rem; color: #16a34a; font-weight: 500;">
+                Instant Allocation &bull; Auto-Approved
+              </span>
+              <button class="btn-pill-dark" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 8px;" onclick='openBookingModal(${JSON.stringify(room)})'>
+                Book Room &rarr;
+              </button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
       }
 
-      rooms.forEach(room => {
-        let acousticTag = 'tag-neutral';
-        if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
-        if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
-        if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
+      // Render Occupied Rooms Section (Standby Waitlist + Urgent Override)
+      const occSection = document.getElementById('occupied-rooms-section');
+      const occGrid = document.getElementById('occupied-rooms-grid');
+      const occBadge = document.getElementById('occupied-count-badge');
 
-        const card = document.createElement('div');
-        card.className = 'room-card';
+      if (occSection && occGrid) {
+        if (occupiedRooms.length > 0) {
+          occSection.style.display = 'block';
+          if (occBadge) occBadge.textContent = `${occupiedRooms.length} occupied`;
+          occGrid.innerHTML = occupiedRooms.map(room => {
+            let acousticTag = 'tag-neutral';
+            if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
+            if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
+            if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
 
-        card.innerHTML = `
-          <div>
-            <div class="room-card-header">
-              <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
-              <span class="pill-badge" style="font-size: 0.75rem;">Cap: ${room.capacity} seats</span>
-            </div>
-            <h3 class="room-title">${room.name}</h3>
-            <div class="room-specs">
-              <span class="pill-tag tag-neutral">High-Speed Wi-Fi</span>
-              <span class="pill-tag tag-neutral">Smart Screen & Audio</span>
-              <span class="pill-tag tag-emerald">● Instant Allocation &bull; Auto-Approved</span>
-            </div>
-          </div>
-          <div class="room-card-footer">
-            <span style="font-size: 0.85rem; color: #16a34a; font-weight: 500;">
-              Instant Allocation &bull; Auto-Approved
-            </span>
-            <button class="btn-pill-dark" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 8px;" onclick='openBookingModal(${JSON.stringify(room)})'>
-              Book Room &rarr;
-            </button>
-          </div>
-        `;
-        container.appendChild(card);
-      });
+            const statusLabel = room.conflicting_status === 'Scanned' ? 'Physically Occupied (Scanned)' : (room.conflicting_status || 'Reserved');
+
+            return `
+              <div class="room-card" style="border: 1.5px solid #fca5a5;">
+                <div>
+                  <div class="room-card-header">
+                    <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
+                    <span class="pill-tag tag-rose" style="font-weight: 700; font-size: 0.72rem;">🔒 ${statusLabel}</span>
+                  </div>
+                  <h3 class="room-title" style="margin-top: 0.4rem;">${room.name}</h3>
+                  <div class="room-specs" style="margin-bottom: 0.85rem;">
+                    <span class="pill-badge" style="font-size: 0.75rem;">Capacity: ${room.capacity}</span>
+                    ${room.current_occupant ? `<span class="pill-tag tag-neutral">Occupant: ${room.current_occupant}</span>` : ''}
+                  </div>
+                  <p style="font-size: 0.82rem; color: #991b1b; margin-bottom: 0.75rem;">
+                    This space is currently reserved. You can join the 3-min Standby queue or submit an urgent override request.
+                  </p>
+                </div>
+                <div class="room-card-footer" style="flex-direction: column; gap: 0.5rem; align-items: stretch;">
+                  <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.5rem;" onclick="joinStandbyWaitlist('${room.id}')">
+                    ⏳ Join Standby Waitlist
+                  </button>
+                  <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.5rem; background: var(--accent-rose);" onclick='openBookingModal(${JSON.stringify(room)}, true)'>
+                    🚨 Request Urgent Override
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          occSection.style.display = 'none';
+        }
+      }
+    }
+
+    async function joinStandbyWaitlist(spaceId) {
+      if (!AppState.searchParams || !AppState.searchParams.startTime) {
+        showToast('Please search for a timeframe first before joining standby queue.', 'warning');
+        return;
+      }
+      try {
+        const payload = {
+          space_id: spaceId,
+          requested_start: AppState.searchParams.startTime,
+          requested_end: AppState.searchParams.endTime
+        };
+        const res = await apiRequest('/api/standby/join', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showToast(res.message || 'Successfully queued on Standby Waitlist! You will receive a 3-minute Flash Claim if the room auto-releases.', 'success');
+        switchStudentTab('dashboard');
+      } catch (err) {
+        console.error('Join standby error:', err);
+      }
+    }
+
+    async function handleAIQuickBook() {
+      const input = document.getElementById('ai-quick-book-input');
+      const btn = document.getElementById('btn-ai-quick-book');
+      if (!input || !input.value.trim()) {
+        showToast('Please describe the room booking you need.', 'warning');
+        return;
+      }
+      const promptText = input.value.trim();
+      const oldText = btn.innerHTML;
+      btn.innerHTML = '<span>⏳ Thinking...</span>';
+      btn.disabled = true;
+
+      try {
+        const parsed = await apiRequest('/api/ai/parse-booking', {
+          method: 'POST',
+          body: JSON.stringify({ prompt: promptText })
+        });
+
+        if (parsed.start_time && parsed.end_time) {
+          document.getElementById('search-start').value = toLocalISOString(new Date(parsed.start_time));
+          document.getElementById('search-end').value = toLocalISOString(new Date(parsed.end_time));
+        }
+        if (parsed.capacity) {
+          document.getElementById('search-capacity').value = parsed.capacity;
+        }
+        if (parsed.acoustic_profile) {
+          document.getElementById('search-acoustic').value = parsed.acoustic_profile;
+        }
+
+        showToast(`✨ AI Parsed: ${parsed.summary}`, 'success');
+        handleStartTimeChange();
+        handleSearch();
+      } catch (err) {
+        console.error('AI quick book error:', err);
+        showToast('AI could not parse instruction. Please enter details manually.', 'error');
+      } finally {
+        btn.innerHTML = oldText;
+        btn.disabled = false;
+      }
     }
 
     function triggerAISlotSuggester(slots = []) {
@@ -2020,7 +2217,7 @@
     // =====================================================================
     let attendeeCardCount = 0;
 
-    function openBookingModal(room) {
+    function openBookingModal(room, forceUrgent = false) {
       AppState.selectedSpace = room;
       const initialCapacity = AppState.searchParams.capacity || 1;
       const accompanyingCount = Math.max(0, initialCapacity - 1);
@@ -2056,6 +2253,9 @@
         } else {
           urgentCheckbox.disabled = false;
           urgentText.textContent = `(${remainingUrgent} of 3 remaining this month)`;
+          if (forceUrgent) {
+            urgentCheckbox.checked = true;
+          }
         }
       }
       updateUrgentNotice();
@@ -2320,17 +2520,40 @@
 
       // 2. Active QR Booking Card
       const activeContainer = document.getElementById('active-booking-container');
-      const bookedReservation = (data.active_bookings || []).find(b => b.status === 'Booked');
+      const bookedReservation = (data.active_bookings || []).find(b => b.status === 'Booked') ||
+                                (data.active_bookings || []).find(b => b.status === 'Scanned' && (new Date(b.end_time) - new Date(b.start_time)) / 3600000 > 1);
 
       if (bookedReservation) {
         const qrData = `CAMPUS_CHECKIN:${bookedReservation.id}:${bookedReservation.user_id}`;
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`;
+        const roomTitle = getRoomName(bookedReservation);
+        const durationHours = (new Date(bookedReservation.end_time) - new Date(bookedReservation.start_time)) / 3600000;
+        let hourlyNotice = '';
+
+        if (durationHours > 1) {
+          const startTime = new Date(bookedReservation.start_time);
+          const hoursElapsed = Math.floor((now - startTime) / 3600000);
+          const nextCheckpoint = new Date(startTime.getTime() + (hoursElapsed + 1) * 3600000);
+          const minsToNext = Math.max(1, Math.round((nextCheckpoint - now) / 60000));
+          hourlyNotice = `
+            <div style="background: rgba(217, 119, 6, 0.08); border-radius: 8px; padding: 0.5rem 0.75rem; margin-top: 0.65rem; font-size: 0.82rem; color: #92400e; border: 1px solid #fde68a;">
+              ⏱️ <strong>Multi-Hour Verification:</strong> Next hourly scan due in <strong>${minsToNext} mins</strong>.
+            </div>
+          `;
+        }
+
+        const actionBadge = bookedReservation.status === 'Scanned'
+          ? '● CHECKED IN &bull; HOURLY RE-VERIFICATION ACTIVE'
+          : 'ACTION REQUIRED &bull; 15-MIN PHYSICAL CHECK-IN';
+        const actionBtnLabel = bookedReservation.status === 'Scanned'
+          ? '📷 Scan Door QR / Hourly Re-Verify'
+          : '📷 Scan QR / Verify Physical Check-In';
 
         activeContainer.innerHTML = `
           <div class="checkin-hero-card">
             <div class="checkin-info">
-              <span class="pill-tag tag-blue" style="margin-bottom: 0.65rem;">ACTION REQUIRED &bull; 15-MIN PHYSICAL CHECK-IN</span>
-              <h3>${bookedReservation.space_name}</h3>
+              <span class="pill-tag tag-blue" style="margin-bottom: 0.65rem;">${actionBadge}</span>
+              <h3>${roomTitle}</h3>
               <p style="color: var(--text-secondary); margin-bottom: 0.75rem; font-size: 0.95rem;">
                 🕒 <strong>Slot:</strong> ${formatDateTime(bookedReservation.start_time)} - ${formatDateTime(bookedReservation.end_time)}
               </p>
@@ -2344,9 +2567,11 @@
                 </div>
               ` : ''}
 
+              ${hourlyNotice}
+
               <div style="margin-top: 1.5rem;">
-                <button class="btn-pill-dark" onclick="verifyQRCheckIn('${bookedReservation.id}')">
-                  📷 Scan QR / Verify Physical Check-In
+                <button class="btn-pill-dark" onclick="verifyQRCheckIn('${bookedReservation.id}', '${bookedReservation.space_id}')">
+                  ${actionBtnLabel}
                 </button>
               </div>
             </div>
@@ -2387,7 +2612,7 @@
               <div>
                 <span class="pill-tag ${statusTag}">${res.status.replace('_', ' ')}</span>
                 ${res.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
-                <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${res.space_name}</h4>
+                <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${getRoomName(res)}</h4>
               </div>
               <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.created_at)}</span>
             </div>
@@ -2415,7 +2640,86 @@
       }
     }
 
-    async function verifyQRCheckIn(reservationId) {
+    // Camera QR Scanner Variables & Logic
+    let activeScanningResId = null;
+    let activeScanningSpaceId = null;
+    let html5QrScanner = null;
+
+    function openCameraScanner(reservationId, spaceId = null) {
+      activeScanningResId = reservationId;
+      activeScanningSpaceId = spaceId;
+      const modal = document.getElementById('camera-scanner-modal');
+      if (modal) modal.classList.add('open');
+
+      const notice = document.getElementById('camera-scanner-notice');
+      if (notice) notice.innerHTML = '';
+
+      if (typeof Html5Qrcode === 'undefined') {
+        if (notice) notice.innerHTML = '<span style="color: var(--accent-amber);">Camera QR scanner library loading... Use manual fallback below if needed.</span>';
+        return;
+      }
+
+      try {
+        if (html5QrScanner) {
+          html5QrScanner.stop().catch(() => {}).finally(() => {
+            try { html5QrScanner.clear(); } catch (_) {}
+            startCameraScannerInstance();
+          });
+        } else {
+          startCameraScannerInstance();
+        }
+      } catch (err) {
+        console.warn('Camera scanner init err:', err);
+      }
+    }
+
+    function startCameraScannerInstance() {
+      html5QrScanner = new Html5Qrcode("camera-scanner-reader");
+      const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+      html5QrScanner.start(
+        { facingMode: "environment" },
+        config,
+        async (decodedText) => {
+          try {
+            await html5QrScanner.stop();
+            html5QrScanner.clear();
+          } catch (_) {}
+          closeCameraScanner();
+
+          if (activeScanningSpaceId && !decodedText.includes(activeScanningSpaceId) && !decodedText.includes('CAMPUS_CHECKIN')) {
+            showToast('Scanned QR code does not match this room door!', 'error');
+            return;
+          }
+
+          await executeQRCheckin(activeScanningResId);
+        },
+        (error) => {}
+      ).catch(err => {
+        console.warn('Camera access unavailable:', err);
+        const notice = document.getElementById('camera-scanner-notice');
+        if (notice) notice.innerHTML = '<span style="color: var(--accent-rose);">⚠️ Camera access unavailable. Please use the button below to verify.</span>';
+      });
+    }
+
+    function closeCameraScanner() {
+      if (html5QrScanner) {
+        html5QrScanner.stop().catch(() => {}).finally(() => {
+          try { html5QrScanner.clear(); } catch (_) {}
+        });
+      }
+      const modal = document.getElementById('camera-scanner-modal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    async function verifyQRCheckInDirectlyFallback() {
+      const resId = activeScanningResId;
+      closeCameraScanner();
+      if (resId) {
+        await executeQRCheckin(resId);
+      }
+    }
+
+    async function executeQRCheckin(reservationId) {
       try {
         const res = await apiRequest(`/api/bookings/${reservationId}/scan-qr`, { method: 'POST' });
         showToast(res.message || 'QR Check-In Verified! Room is officially Scanned.', 'success');
@@ -2423,6 +2727,10 @@
       } catch (err) {
         console.error('QR Check-In error:', err);
       }
+    }
+
+    function verifyQRCheckIn(reservationId, spaceId = null) {
+      openCameraScanner(reservationId, spaceId);
     }
 
     // =====================================================================
@@ -2475,7 +2783,7 @@
             <div>
               <span class="pill-tag ${tagClass}">${item.status.replace('_', ' ')}</span>
               ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
-              <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${item.space_name}</h4>
+              <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${getRoomName(item)}</h4>
             </div>
             <span style="font-size: 0.82rem; color: var(--text-muted);">${formatDateTime(item.created_at)}</span>
           </div>
@@ -2847,6 +3155,74 @@
             </div>
           </div>
 
+          <!-- Interactive 2D Campus Floor Plan SVG Blueprint -->
+          <div style="background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 1.25rem 1.5rem; margin-bottom: 2rem; box-shadow: var(--shadow-sm);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <h3 style="font-size: 1.15rem; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                  <span>🗺️ Campus Blueprint &bull; Interactive 2D Floor Plan</span>
+                </h3>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.2rem 0 0;">
+                  Click any room in the blueprint to instantly quick-book or request urgent override.
+                </p>
+              </div>
+              <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; font-weight: 600;">
+                <span style="display: inline-flex; align-items: center; gap: 5px;">
+                  <span style="width: 12px; height: 12px; border-radius: 3px; background: #dcfce7; border: 1.5px solid #15803d;"></span>
+                  Available
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 5px;">
+                  <span style="width: 12px; height: 12px; border-radius: 3px; background: #fee2e2; border: 1.5px solid #b91c1c;"></span>
+                  Occupied
+                </span>
+              </div>
+            </div>
+
+            <div style="width: 100%; overflow-x: auto;">
+              <svg viewBox="0 0 840 250" style="width: 100%; min-width: 720px; height: auto; border-radius: 12px; background: #FFFFFF; border: 1px solid var(--border);">
+                <!-- Building Outer Boundary -->
+                <rect x="5" y="5" width="830" height="240" rx="14" fill="#FAFAF9" stroke="#E2E8F0" stroke-width="1.5" />
+
+                <!-- Central Hallway Corridors -->
+                <rect x="250" y="15" width="50" height="220" fill="#F4F1EC" rx="6" stroke="#E0DAD1" stroke-width="1.5" stroke-dasharray="4 4" />
+                <text x="275" y="125" text-anchor="middle" transform="rotate(-90 275 125)" font-size="9.5" font-weight="700" fill="#848079" letter-spacing="2">WEST CORRIDOR</text>
+
+                <rect x="540" y="15" width="50" height="220" fill="#F4F1EC" rx="6" stroke="#E0DAD1" stroke-width="1.5" stroke-dasharray="4 4" />
+                <text x="565" y="125" text-anchor="middle" transform="rotate(-90 565 125)" font-size="9.5" font-weight="700" fill="#848079" letter-spacing="2">EAST CORRIDOR</text>
+
+                <!-- Room Blocks -->
+                ${[
+                  { key: "innovation", name: "Central Innovation Lab", x: 20, y: 20, w: 220, h: 95 },
+                  { key: "collaborative lounge", name: "Student Collaborative Lounge", x: 20, y: 135, w: 220, h: 95 },
+                  { key: "research", name: "Library Quiet Research Suite", x: 310, y: 20, w: 220, h: 95 },
+                  { key: "silent study", name: "Library Silent Study Pod", x: 310, y: 135, w: 220, h: 95 },
+                  { key: "lecture hall", name: "Main Campus Lecture Hall", x: 600, y: 20, w: 220, h: 95 },
+                  { key: "auditorium", name: "University Grand Auditorium", x: 600, y: 135, w: 220, h: 95 }
+                ].map(cfg => {
+                  const roomObj = rooms.find(r => r.name.toLowerCase().includes(cfg.key)) || rooms.find(r => r.name === cfg.name);
+                  if (!roomObj) return '';
+                  const isOcc = roomObj.is_occupied;
+                  const fill = isOcc ? '#fee2e2' : '#dcfce7';
+                  const stroke = isOcc ? '#b91c1c' : '#15803d';
+                  const badgeText = isOcc ? '🔴 Occupied' : '🟢 Free';
+                  const badgeFill = isOcc ? '#991b1b' : '#15803d';
+                  const subText = `${roomObj.capacity} Seats • ${roomObj.acoustic_profile}`;
+
+                  return `
+                    <g style="cursor: pointer;" onclick="handleFloorPlanRoomClick('${roomObj.id}')">
+                      <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" />
+                      <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B">${roomObj.name}</text>
+                      <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B">${subText}</text>
+                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="80" height="20" rx="10" fill="${isOcc ? '#fecaca' : '#bbf7d0'}" />
+                      <text x="${cfg.x + 54}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}">${badgeText}</text>
+                      <text x="${cfg.x + cfg.w - 14}" y="${cfg.y + 74}" text-anchor="end" font-size="9.5" font-weight="600" fill="#475569">Click ↗</text>
+                    </g>
+                  `;
+                }).join('')}
+              </svg>
+            </div>
+          </div>
+
           <!-- Live Room Cards Grid -->
           <div class="rooms-grid">
             ${rooms.map(room => {
@@ -2937,6 +3313,32 @@
       }
     }
 
+    function handleFloorPlanRoomClick(roomId) {
+      const room = (AppState.allSpaces || []).find(s => s.id === roomId);
+      if (!room) return;
+      if (!room.is_occupied) {
+        quickBookSpaceFromLive(room);
+      } else {
+        openOccupiedRoomModal(room);
+      }
+    }
+
+    function openOccupiedRoomModal(room) {
+      AppState.selectedSpace = room;
+      const modal = document.getElementById('occupied-room-modal');
+      if (modal) {
+        document.getElementById('occ-modal-room-name').textContent = room.name;
+        document.getElementById('occ-modal-details').textContent = `${room.capacity} Seats • ${room.acoustic_profile} Profile`;
+        modal.classList.add('open');
+      } else {
+        if (confirm(`"${room.name}" is currently occupied.\n\nClick OK to request an Urgent Override, or Cancel to join Standby Waitlist.`)) {
+          openBookingModal(room, true);
+        } else {
+          joinStandbyWaitlist(room.id);
+        }
+      }
+    }
+
     function quickBookSpaceFromLive(room) {
       initializeDateTimeInputs();
       AppState.searchParams = {
@@ -2954,7 +3356,7 @@
         const activeRes = (dashboard.active_bookings || []).find(b => b.space_id === spaceId && b.status === 'Booked');
         if (activeRes) {
           await verifyQRCheckIn(activeRes.id);
-          showToast(`Physical Door QR Scanned! Check-in confirmed for ${activeRes.space_name}.`, 'success');
+          showToast(`Physical Door QR Scanned! Check-in confirmed for ${getRoomName(activeRes)}.`, 'success');
         } else {
           showToast(`Door QR scanned. No active reservation found for this space right now.`, 'info');
           switchStudentTab('live-status');

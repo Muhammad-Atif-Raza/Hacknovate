@@ -48,6 +48,41 @@ def process_qr_auto_release_and_standby_rotation(db: Session):
         activate_standby_for_slot(db, res.space_id, res.start_time, res.end_time, now)
 
     # -------------------------------------------------------------------------
+    # 1B. Hourly Re-Scan Verification for Active Multi-Hour Scanned Bookings
+    # -------------------------------------------------------------------------
+    active_scanned = (
+        db.query(Reservation)
+        .filter(
+            Reservation.status == ReservationStatus.SCANNED,
+            Reservation.start_time <= now,
+            Reservation.end_time > now,
+        )
+        .all()
+    )
+
+    for res in active_scanned:
+        total_duration_hours = (res.end_time - res.start_time).total_seconds() / 3600.0
+        if total_duration_hours > 1.0:
+            hours_elapsed = int((now - res.start_time).total_seconds() // 3600)
+            if hours_elapsed >= 1:
+                # Target hourly mark for the current hour
+                hour_checkpoint = res.start_time + timedelta(hours=hours_elapsed)
+                grace_cutoff = hour_checkpoint + timedelta(minutes=15)
+                window_open = hour_checkpoint - timedelta(minutes=5)
+
+                if now > grace_cutoff:
+                    # Check if student refreshed scan in this window
+                    last_scan = getattr(res, "last_scanned_at", None)
+                    if last_scan is None or last_scan < window_open:
+                        res.status = ReservationStatus.EXPIRED
+                        expired_count += 1
+                        logger.warning(
+                            f"[HOURLY RE-SCAN AUTO-RELEASE] Multi-hour reservation {res.id} on space {res.space_id} "
+                            f"auto-expired due to missed hourly physical verification scan."
+                        )
+                        activate_standby_for_slot(db, res.space_id, now, res.end_time, now)
+
+    # -------------------------------------------------------------------------
     # 2. Check for Expired 3-Minute Flash Claims on Standby Waitlist
     # -------------------------------------------------------------------------
     expired_claims = (
