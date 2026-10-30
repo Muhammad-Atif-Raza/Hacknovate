@@ -3349,7 +3349,7 @@
                   <span>🗺️ Campus Blueprint &bull; Interactive 2D Floor Plan</span>
                 </h3>
                 <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.2rem 0 0;">
-                  Click any room in the blueprint to instantly quick-book or request urgent override.
+                  Live visual blueprint of campus room occupancy. Use the room cards below to book or request an override.
                 </p>
               </div>
               <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; font-weight: 600;">
@@ -3395,13 +3395,12 @@
                   const subText = `${roomObj.capacity} Seats • ${roomObj.acoustic_profile}`;
 
                   return `
-                    <g style="cursor: pointer; pointer-events: all; position: relative; z-index: 20;" onclick="window.handleFloorPlanRoomClick('${roomObj.id}')">
-                      <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" style="pointer-events: none;" />
-                      <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B" style="pointer-events: none;">${roomObj.name}</text>
-                      <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B" style="pointer-events: none;">${subText}</text>
-                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="80" height="20" rx="10" fill="${isOcc ? '#fecaca' : '#bbf7d0'}" style="pointer-events: none;" />
-                      <text x="${cfg.x + 54}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}" style="pointer-events: none;">${badgeText}</text>
-                      <text x="${cfg.x + cfg.w - 14}" y="${cfg.y + 74}" text-anchor="end" font-size="9.5" font-weight="600" fill="#475569" style="pointer-events: none;">Click ↗</text>
+                    <g>
+                      <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" />
+                      <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B">${roomObj.name}</text>
+                      <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B">${subText}</text>
+                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="80" height="20" rx="10" fill="${isOcc ? '#fecaca' : '#bbf7d0'}" />
+                      <text x="${cfg.x + 54}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}">${badgeText}</text>
                     </g>
                   `;
                 }).join('')}

@@ -1,0 +1,3 @@
+LIVE_URL=https://airports-overnight-exercise-proof.trycloudflare.com
+API_HEALTH=https://airports-overnight-exercise-proof.trycloudflare.com/api/health
+FRONTEND_APP=https://airports-overnight-exercise-proof.trycloudflare.com/
