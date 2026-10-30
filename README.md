@@ -1,0 +1,5 @@
+In the domain of Digital and Civic tech, we found a major issue and our problem statement - Campus spaces and equipment are frequently locked up through informal channels (WhatsApp chats, verbal agreements, or paper registers), resulting in three major issues:
+
+Double-bookings: Multiple clubs or batches claiming the same room simultaneously.
+Ghost bookings: Spaces reserved on paper that are completely empty.
+Zero transparency: Students and staff have no easy way to check real-time availability.
