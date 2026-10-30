@@ -377,24 +377,19 @@ def search_rooms(
         .all()
     }
 
-    # Query matching and free spaces
-    available_rooms_query = (
-        db.query(Space)
-        .filter(
-            Space.capacity >= capacity,
-            Space.acoustic_profile == acoustic_profile,
-        )
-    )
+    matching_query = db.query(Space).filter(Space.capacity >= capacity)
+    if acoustic_profile:
+        matching_query = matching_query.filter(Space.acoustic_profile == acoustic_profile)
+    all_matching = matching_query.order_by(Space.name.asc()).all()
 
-    if busy_space_ids:
-        available_rooms_query = available_rooms_query.filter(~Space.id.in_(busy_space_ids))
-
-    available_rooms = available_rooms_query.all()
+    available_rooms = [s for s in all_matching if s.id not in busy_space_ids]
+    occupied_rooms = [s for s in all_matching if s.id in busy_space_ids]
 
     if available_rooms:
         return RoomSearchResponse(
             available_rooms=[SpaceResponse.model_validate(s) for s in available_rooms],
             ml_suggested_slots=[],
+            occupied_rooms=[SpaceResponse.model_validate(s) for s in occupied_rooms],
         )
 
     # 0 rooms available -> Trigger ML Smart Slot Suggester Fallback
@@ -414,6 +409,7 @@ def search_rooms(
     return RoomSearchResponse(
         available_rooms=[],
         ml_suggested_slots=suggested_slots,
+        occupied_rooms=[SpaceResponse.model_validate(s) for s in occupied_rooms],
     )
 
 
@@ -468,7 +464,7 @@ def create_booking(
         ReservationStatus.BOOKED,
         ReservationStatus.SCANNED,
     ]
-    conflicting_res = (
+    conflicting_reservations = (
         db.query(Reservation)
         .filter(
             Reservation.space_id == payload.space_id,
@@ -476,14 +472,8 @@ def create_booking(
             Reservation.start_time < end_utc,
             Reservation.end_time > start_utc,
         )
-        .first()
+        .all()
     )
-
-    if conflicting_res:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This space is already reserved for the selected timeframe. You can join the standby waitlist!",
-        )
 
     if payload.is_urgent:
         if current_user.urgent_requests_used >= 3:
@@ -491,10 +481,22 @@ def create_booking(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Monthly urgent request quota (3/3) exhausted.",
             )
+        # Check if room is already physically occupied (Scanned)
+        has_scanned = any(r.status == ReservationStatus.SCANNED for r in conflicting_reservations)
+        if has_scanned:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This space is already physically occupied and checked in. Urgent requests cannot displace an active occupant.",
+            )
+        # If not scanned, urgent request can be submitted for Admin override review
         current_user.urgent_requests_used += 1
-        # Urgent requests jump to the top of Admin Pending Requests queue for fast-tracking
         booking_status = ReservationStatus.PENDING_PERMISSION
     else:
+        if conflicting_reservations:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This space is already reserved for the selected timeframe. You can join the standby waitlist or submit an urgent request!",
+            )
         booking_status = ReservationStatus.BOOKED
         current_user.total_bookings += 1
 
@@ -511,6 +513,8 @@ def create_booking(
         is_urgent=payload.is_urgent,
         created_at=datetime.utcnow(),
     )
+    reservation.space = space
+    reservation.user = current_user
     db.add(reservation)
     db.commit()
     db.refresh(reservation)

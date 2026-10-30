@@ -123,8 +123,17 @@ class ReservationResponse(BaseModel):
     created_at: datetime
     space: Optional[SpaceResponse] = None
     user: Optional[UserResponse] = None
+    space_name: Optional[str] = None
+    room_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def resolve_room_names(self) -> "ReservationResponse":
+        if self.space and self.space.name:
+            self.space_name = self.space.name
+            self.room_name = self.space.name
+        return self
 
 
 # ==========================================
@@ -201,6 +210,7 @@ class MLSuggestedSlotResponse(BaseModel):
 class RoomSearchResponse(BaseModel):
     available_rooms: List[SpaceResponse]
     ml_suggested_slots: List[MLSuggestedSlotResponse] = []
+    occupied_rooms: List[SpaceResponse] = []
 
 
 # ==========================================

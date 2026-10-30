@@ -8,38 +8,48 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Line Icons & HTML5-QRCode Scanner CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   
   <style>
     :root {
-      --bg-page: #E5DFD7;
-      --surface: #EFECE6;
-      --surface-card: #F7F4EF;
-      --surface-card-hover: #FFFFFF;
-      --border: #D5CFC7;
-      --border-subtle: #E0DAD1;
-      --text-primary: #2B2927;
-      --text-secondary: #5B5955;
-      --text-muted: #848079;
-      --badge-bg: #FDF3DF;
-      --badge-text: #1E1F21;
-      --btn-dark: #5B5955;
-      --btn-dark-hover: #2B2927;
+      --bg-page: #F4F1EC;
+      --surface: #FFFFFF;
+      --surface-card: #FFFFFF;
+      --surface-card-hover: #FAFAF8;
+      --border: #E5E0D8;
+      --border-subtle: #ECE7E0;
+      --text-primary: #1F2421;
+      --text-secondary: #58605C;
+      --text-muted: #848D88;
+      --badge-bg: #EAE6DF;
+      --badge-text: #1F2421;
+      --btn-dark: #1F5E4A;
+      --btn-dark-hover: #164637;
       --btn-dark-text: #FFFFFF;
       --accent-gold: #C68B59;
-      --accent-emerald: #16A34A;
+      --accent-emerald: #15803D;
       --accent-emerald-bg: #DCFCE7;
-      --accent-amber: #D97706;
+      --accent-emerald-border: #86EFAC;
+      --accent-amber: #B45309;
       --accent-amber-bg: #FEF3C7;
-      --accent-rose: #DC2626;
+      --accent-amber-border: #FDE68A;
+      --accent-rose: #B91C1C;
       --accent-rose-bg: #FEE2E2;
-      --accent-blue: #2563EB;
+      --accent-rose-border: #FCA5A5;
+      --accent-blue: #1D4ED8;
       --accent-blue-bg: #DBEAFE;
-      --radius-pill: 9999px;
-      --radius-card: 20px;
-      --radius-inner: 14px;
-      --shadow-sm: 0 2px 8px rgba(43, 41, 39, 0.04);
-      --shadow-md: 0 8px 24px -4px rgba(43, 41, 39, 0.08);
-      --shadow-lg: 0 16px 36px -6px rgba(43, 41, 39, 0.12);
+      --accent-blue-border: #93C5FD;
+      --accent-grey: #4B5563;
+      --accent-grey-bg: #F3F4F6;
+      --accent-grey-border: #E5E7EB;
+      --radius-pill: 8px;
+      --radius-card: 12px;
+      --radius-inner: 8px;
+      --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.08);
       --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
@@ -66,9 +76,18 @@
       letter-spacing: -0.02em;
     }
 
+    /* Lucide Line Icon Standardization */
+    i[data-lucide], .lucide {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+      vertical-align: middle;
+      stroke-width: 2;
+    }
+
     /* App Header */
     .app-header {
-      background-color: rgba(239, 236, 230, 0.88);
+      background-color: rgba(255, 255, 255, 0.94);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
@@ -94,9 +113,9 @@
     .brand-logo-icon {
       width: 40px;
       height: 40px;
-      background: linear-gradient(135deg, #2B2927 0%, #5B5955 100%);
+      background: var(--btn-dark);
       color: #FFFFFF;
-      border-radius: 12px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -125,9 +144,10 @@
     }
 
     .nav-tab-btn {
-      padding: 0.55rem 1.15rem;
-      border-radius: var(--radius-pill);
-      border: 1px solid transparent;
+      padding: 0.65rem 1rem;
+      border-radius: 8px;
+      border: none;
+      border-bottom: 2px solid transparent;
       background: transparent;
       color: var(--text-secondary);
       font-size: 0.88rem;
@@ -140,15 +160,16 @@
     }
 
     .nav-tab-btn:hover {
-      background: var(--surface-card);
-      color: var(--text-primary);
+      color: var(--btn-dark);
+      background: rgba(31, 94, 74, 0.05);
     }
 
     .nav-tab-btn.active {
-      background: #FFFFFF;
-      color: var(--text-primary);
-      border-color: var(--border);
-      box-shadow: var(--shadow-sm);
+      color: var(--btn-dark);
+      border-bottom: 2px solid var(--btn-dark);
+      border-radius: 0;
+      background: transparent;
+      font-weight: 700;
     }
 
     /* Buttons */
@@ -156,7 +177,7 @@
       background-color: var(--btn-dark);
       color: var(--btn-dark-text);
       border: none;
-      border-radius: var(--radius-pill);
+      border-radius: 8px;
       padding: 0.65rem 1.4rem;
       font-size: 0.9rem;
       font-weight: 600;
@@ -167,21 +188,21 @@
       gap: 8px;
       white-space: nowrap;
       transition: var(--transition);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 6px rgba(31, 94, 74, 0.15);
       text-decoration: none;
     }
 
     .btn-pill-dark:hover {
       background-color: var(--btn-dark-hover);
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 12px rgba(31, 94, 74, 0.25);
     }
 
     .btn-pill-outline {
-      background-color: transparent;
+      background-color: #FFFFFF;
       color: var(--text-primary);
       border: 1.5px solid var(--border);
-      border-radius: var(--radius-pill);
+      border-radius: 8px;
       padding: 0.6rem 1.35rem;
       font-size: 0.9rem;
       font-weight: 600;
@@ -195,7 +216,7 @@
     }
 
     .btn-pill-outline:hover {
-      background-color: var(--surface-card);
+      background-color: #FAFAF8;
       border-color: var(--text-secondary);
     }
 
@@ -203,7 +224,7 @@
       background: #FFFFFF;
       color: #3c4043;
       border: 1px solid #dadce0;
-      border-radius: var(--radius-pill);
+      border-radius: 8px;
       padding: 0.6rem 1.25rem;
       font-size: 0.88rem;
       font-weight: 600;
@@ -221,7 +242,7 @@
       box-shadow: 0 3px 8px rgba(60,64,67,0.15);
     }
 
-    /* Badges */
+    /* Badges & Status Tags - STRICT COLOR ENFORCEMENT */
     .pill-badge {
       display: inline-flex;
       align-items: center;
@@ -229,11 +250,11 @@
       background-color: var(--badge-bg);
       color: var(--badge-text);
       padding: 0.35rem 0.9rem;
-      border-radius: var(--radius-pill);
+      border-radius: 8px;
       font-size: 0.78rem;
       font-weight: 700;
       letter-spacing: 0.02em;
-      border: 1px solid rgba(212, 163, 115, 0.3);
+      border: 1px solid var(--border);
     }
 
     .pill-tag {
@@ -241,13 +262,163 @@
       align-items: center;
       gap: 0.35rem;
       padding: 0.25rem 0.75rem;
-      border-radius: var(--radius-pill);
+      border-radius: 8px;
       font-size: 0.75rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+
+    /* Strict Status Color Coding */
+    .tag-emerald, .tag-booked, .tag-available {
+      background: var(--accent-emerald-bg);
+      color: var(--accent-emerald);
+      border-color: var(--accent-emerald-border);
+    }
+    .tag-amber, .tag-pending {
+      background: var(--accent-amber-bg);
+      color: var(--accent-amber);
+      border-color: var(--accent-amber-border);
+    }
+    .tag-rose, .tag-denied, .tag-occupied, .tag-expired {
+      background: var(--accent-rose-bg);
+      color: var(--accent-rose);
+      border-color: var(--accent-rose-border);
+    }
+    .tag-blue, .tag-scanned, .tag-completed {
+      background: var(--accent-blue-bg);
+      color: var(--accent-blue);
+      border-color: var(--accent-blue-border);
+    }
+    .tag-neutral, .tag-cancelled {
+      background: var(--accent-grey-bg);
+      color: var(--accent-grey);
+      border-color: var(--accent-grey-border);
+    }
+
+    /* Profile Dropdown Component */
+    .profile-dropdown-container {
+      position: relative;
+      display: inline-block;
+    }
+    .profile-trigger-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.85rem;
+      border-radius: 8px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      transition: var(--transition);
+    }
+    .profile-trigger-btn:hover {
+      background: #FAFAF8;
+      border-color: var(--btn-dark);
+    }
+    .profile-dropdown-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      width: 250px;
+      padding: 1rem;
+      z-index: 250;
+      display: none;
+    }
+    .profile-dropdown-menu.open {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+
+    /* Quick-pick chips */
+    .quick-chips-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .quick-chip {
+      padding: 0.35rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      transition: var(--transition);
+    }
+    .quick-chip:hover {
+      border-color: var(--btn-dark);
+      color: var(--btn-dark);
+      background: rgba(31, 94, 74, 0.05);
+    }
+
+    /* Acoustic Profile Toggles */
+    .acoustic-toggles-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .acoustic-toggle-btn {
+      flex: 1;
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      background: #FFFFFF;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      transition: var(--transition);
+    }
+    .acoustic-toggle-btn:hover {
+      border-color: var(--btn-dark);
+      color: var(--btn-dark);
+    }
+    .acoustic-toggle-btn.active {
+      border-color: var(--btn-dark);
+      background: rgba(31, 94, 74, 0.08);
+      color: var(--btn-dark);
       font-weight: 700;
     }
 
-    .tag-emerald { background: var(--accent-emerald-bg); color: var(--accent-emerald); }
-    .tag-amber { background: var(--accent-amber-bg); color: var(--accent-amber); }
+    /* Mobile Responsiveness & Loading Shimmer */
+    @media (max-width: 768px) {
+      .app-header { padding: 0.75rem 1rem; flex-wrap: wrap; gap: 0.75rem; }
+      .header-nav { overflow-x: auto; max-width: 100%; white-space: nowrap; }
+      .admin-layout { grid-template-columns: 1fr; }
+      .checkin-hero-card { grid-template-columns: 1fr; }
+      .search-form-grid { grid-template-columns: 1fr; }
+      .admin-stat-grid { grid-template-columns: 1fr 1fr; }
+      .attendee-inputs-grid { grid-template-columns: 1fr; }
+      .rooms-grid { grid-template-columns: 1fr; }
+      .data-table { display: block; overflow-x: auto; }
+    }
+
+    .loading-shimmer {
+      background: linear-gradient(90deg, #f0ede8 25%, #e8e4dd 50%, #f0ede8 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
     .tag-rose { background: var(--accent-rose-bg); color: var(--accent-rose); }
     .tag-blue { background: var(--accent-blue-bg); color: var(--accent-blue); }
     .tag-neutral { background: #E5DFD7; color: var(--text-secondary); }
@@ -990,25 +1161,62 @@
 
       <!-- Authenticated Student State -->
       <div id="header-student-nav" style="display: none; align-items: center; gap: 0.75rem;">
-        <button class="nav-tab-btn active" id="tab-btn-search" onclick="switchStudentTab('search')">🔍 Search Rooms</button>
-        <button class="nav-tab-btn" id="tab-btn-live-status" onclick="switchStudentTab('live-status')">🔴 Live Room Status</button>
-        <button class="nav-tab-btn" id="tab-btn-dashboard" onclick="switchStudentTab('dashboard')">📋 My Dashboard</button>
-        <button class="nav-tab-btn" id="tab-btn-history" onclick="switchStudentTab('history')">📜 History</button>
-        <div class="pill-badge" id="student-user-pill">
-          <span id="student-header-name">Student</span>
-          <span class="pill-tag tag-emerald" id="student-header-bookings">0 Bookings</span>
-          <span class="pill-tag tag-rose" id="student-header-urgencies" style="margin-left: 4px; font-size: 0.75rem;">3/3 Urgencies</span>
+        <button class="nav-tab-btn active" id="tab-btn-search" onclick="switchStudentTab('search')">
+          <i data-lucide="search"></i> Search Rooms
+        </button>
+        <button class="nav-tab-btn" id="tab-btn-live-status" onclick="switchStudentTab('live-status')">
+          <i data-lucide="radio"></i> Live Room Status
+        </button>
+        <button class="nav-tab-btn" id="tab-btn-dashboard" onclick="switchStudentTab('dashboard')">
+          <i data-lucide="layout-dashboard"></i> My Dashboard
+        </button>
+        <button class="nav-tab-btn" id="tab-btn-history" onclick="switchStudentTab('history')">
+          <i data-lucide="history"></i> History
+        </button>
+
+        <!-- Dropdown Student Profile Menu -->
+        <div class="profile-dropdown-container">
+          <button class="profile-trigger-btn" onclick="toggleProfileDropdown(event)">
+            <span id="student-avatar-initials" style="width: 26px; height: 26px; border-radius: 50%; background: #1F5E4A; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">ST</span>
+            <span id="student-header-name">Student</span>
+            <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+          </button>
+          <div id="student-profile-dropdown" class="profile-dropdown-menu">
+            <div style="padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 0.75rem;">
+              <div id="dropdown-user-name" style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">Student Name</div>
+              <div id="dropdown-user-email" style="font-size: 0.78rem; color: var(--text-muted); word-break: break-all;">student@st.niituniversity.in</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                <span style="color: var(--text-secondary); display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="calendar-check" style="width: 14px; height: 14px;"></i> Bookings:
+                </span>
+                <span class="pill-tag tag-emerald" id="student-header-bookings">0 Bookings</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                <span style="color: var(--text-secondary); display: flex; align-items: center; gap: 5px;">
+                  <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i> Urgencies Left:
+                </span>
+                <span class="pill-tag tag-rose" id="student-header-urgencies">3/3 left</span>
+              </div>
+            </div>
+            <button class="btn-pill-outline" style="width: 100%; padding: 0.45rem; font-size: 0.82rem; justify-content: center; gap: 6px;" onclick="signOut()">
+              <i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Sign Out
+            </button>
+          </div>
         </div>
-        <button class="btn-pill-outline" style="padding: 0.45rem 1rem; font-size: 0.82rem;" onclick="signOut()">Sign Out</button>
       </div>
 
       <!-- Authenticated Admin State -->
       <div id="header-admin-nav" style="display: none; align-items: center; gap: 0.75rem;">
-        <span class="pill-tag tag-amber">FACULTY CONSOLE</span>
+        <span class="pill-tag tag-amber"><i data-lucide="shield"></i> Faculty Console</span>
         <div class="pill-badge">
+          <i data-lucide="user" style="width: 14px; height: 14px;"></i>
           <span id="admin-header-name">Dr. Connor</span>
         </div>
-        <button class="btn-pill-outline" style="padding: 0.45rem 1rem; font-size: 0.82rem;" onclick="signOut()">Sign Out</button>
+        <button class="btn-pill-outline" style="padding: 0.45rem 1rem; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px;" onclick="signOut()">
+          <i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Sign Out
+        </button>
       </div>
     </div>
   </header>
@@ -1019,37 +1227,45 @@
   <main id="view-landing" class="view-container">
     <section class="hero-section">
       <div class="hero-badge">
-        <span class="pill-badge">✨ OFFICIAL UNIVERSITY FACILITY RESERVATION SYSTEM</span>
+        <span class="pill-badge"><i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Official University Facility Reservation System</span>
       </div>
       <h2 class="hero-title">Campus Resource Hub</h2>
       <p class="hero-subtitle">
-        Eliminate informal WhatsApp requests and paper registers. Experience conflict-free digital room bookings, acoustic category indexing, QR attendance validation, and dynamic standby reassignment.
+        Book campus rooms in seconds. No WhatsApp, no paper.
       </p>
       <div class="hero-cta-group">
-        <button class="btn-pill-dark" onclick="openGoogleModal()" style="font-size: 1rem; padding: 0.85rem 2rem;">
-          Book a Room Now <span>&rarr;</span>
-        </button>
-        <button class="btn-pill-outline" onclick="openGoogleModal()" style="font-size: 1rem; padding: 0.8rem 1.85rem;">
-          Portal Sign In
+        <button class="btn-pill-dark" onclick="openGoogleModal()" style="font-size: 1rem; padding: 0.85rem 2.2rem; display: inline-flex; align-items: center; gap: 10px;">
+          <span>Book a Room Now</span>
+          <i data-lucide="arrow-right" style="width: 18px; height: 18px;"></i>
         </button>
       </div>
 
-      <!-- 3 Feature Highlight Cards in a Single Straight Horizontal Line -->
+      <!-- 3-Step "How It Works" Strip -->
+      <div style="margin-bottom: 1.5rem; text-align: left; width: 100%; max-width: 1100px;">
+        <h4 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">How it works</h4>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Simple 3-step physical room reservation workflow for students and faculty.</p>
+      </div>
       <div class="hero-features-grid">
         <div class="feature-card">
-          <div class="feature-icon-wrapper">🎧</div>
-          <h3>Acoustic Indexing</h3>
-          <p>Index rooms by precise acoustic profiles: <strong>Silent</strong> pods, <strong>Collaborative</strong> labs, or <strong>Amplified</strong> audis.</p>
+          <div class="feature-icon-wrapper" style="background: rgba(31, 94, 74, 0.1); color: var(--btn-dark); border-color: rgba(31, 94, 74, 0.2);">
+            <i data-lucide="search" style="width: 22px; height: 22px;"></i>
+          </div>
+          <h3>1. Search Spaces</h3>
+          <p>Find available rooms filtered by capacity, time slot, and acoustic profiles (Silent, Collaborative, Amplified).</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon-wrapper">📱</div>
-          <h3>15-Min QR Check-In</h3>
-          <p>Automated physical scan validation prevents phantom slots. No-show reservations are automatically liberated back to students.</p>
+          <div class="feature-icon-wrapper" style="background: rgba(22, 163, 74, 0.1); color: #16a34a; border-color: rgba(22, 163, 74, 0.2);">
+            <i data-lucide="check-circle-2" style="width: 22px; height: 22px;"></i>
+          </div>
+          <h3>2. Instant Allocation</h3>
+          <p>Conflict-free empty rooms are auto-approved instantly with zero waiting time and full transparency.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon-wrapper">⚡</div>
-          <h3>Standby Flash Claims</h3>
-          <p>Join the dynamic waitlist. When rooms release, standby candidates receive an urgent 3-minute flash claim alert directly in their portal.</p>
+          <div class="feature-icon-wrapper" style="background: rgba(37, 99, 235, 0.1); color: #2563eb; border-color: rgba(37, 99, 235, 0.2);">
+            <i data-lucide="qr-code" style="width: 22px; height: 22px;"></i>
+          </div>
+          <h3>3. Scan QR at Door</h3>
+          <p>Arrive at the room and scan the door plaque QR code with your device camera within 15 minutes to confirm.</p>
         </div>
       </div>
     </section>
@@ -1063,37 +1279,67 @@
     <!-- TAB 1: Search & Room Allocation -->
     <div id="student-tab-search" class="portal-tab-content active">
       <section class="search-card">
-        <h3 class="section-title" style="margin-bottom: 1.25rem;">🔍 Conflict-Free Room Search</h3>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+          <h3 class="section-title">
+            <i data-lucide="search"></i> Find available campus rooms
+          </h3>
+          <div class="quick-chips-row" style="margin-top: 0;">
+            <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;">Quick pick:</span>
+            <button type="button" class="quick-chip" onclick="applyQuickSlot('now')">
+              <i data-lucide="zap" style="width: 14px; height: 14px;"></i> Now
+            </button>
+            <button type="button" class="quick-chip" onclick="applyQuickSlot('next1hr')">
+              <i data-lucide="clock" style="width: 14px; height: 14px;"></i> Next 1 hr
+            </button>
+            <button type="button" class="quick-chip" onclick="applyQuickSlot('tomorrow')">
+              <i data-lucide="sunrise" style="width: 14px; height: 14px;"></i> Tomorrow morning
+            </button>
+          </div>
+        </div>
 
         <!-- Multi-error validation banner (flags ALL errors together) -->
         <div id="search-error-banner" class="validation-alert-box" style="display: none;"></div>
 
         <form id="search-form" novalidate onsubmit="handleSearch(event)">
-          <div class="search-form-grid">
+          <!-- One-Row Inputs: From, To, Capacity, Find Button -->
+          <div class="search-form-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) 120px auto;">
             <div class="input-group">
-              <label for="search-start">From Date & Time (24/7)</label>
+              <label for="search-start">From (24/7)</label>
               <input type="datetime-local" id="search-start" class="input-field" onchange="handleStartTimeChange()">
             </div>
             <div class="input-group">
-              <label for="search-end">To Date & Time</label>
+              <label for="search-end">To</label>
               <input type="datetime-local" id="search-end" class="input-field">
             </div>
             <div class="input-group">
-              <label for="search-capacity">Required Capacity (1 - 100)</label>
+              <label for="search-capacity">Seats (1-100)</label>
               <input type="number" id="search-capacity" class="input-field" min="1" max="100" value="3">
             </div>
-            <div class="input-group">
-              <label for="search-acoustic">Acoustic Profile</label>
-              <select id="search-acoustic" class="input-field">
-                <option value="">-- Select Acoustic Profile --</option>
-                <option value="Silent">Silent (Focus & Pods)</option>
-                <option value="Collaborative">Collaborative (Group Projects)</option>
-                <option value="Amplified">Amplified (Lectures & Audio)</option>
-              </select>
-            </div>
             <div>
-              <button type="submit" class="btn-pill-dark" style="width: 100%; height: 48px;">
-                Find Available Rooms
+              <button type="submit" class="btn-pill-dark" style="width: 100%; height: 46px; gap: 6px;">
+                <i data-lucide="search" style="width: 16px; height: 16px;"></i> Find Rooms
+              </button>
+            </div>
+          </div>
+
+          <!-- Acoustic Profile 3 Tappable Icon-Buttons -->
+          <div style="margin-top: 1.15rem;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 0.45rem;">
+              Acoustic Profile
+            </label>
+            <input type="hidden" id="search-acoustic" value="">
+            <div class="acoustic-toggles-row">
+              <button type="button" class="acoustic-toggle-btn active" id="acoustic-btn-all" onclick="selectAcousticProfile('')">
+                <i data-lucide="layers" style="width: 16px; height: 16px;"></i> Any Acoustic Profile
+              </button>
+              <button type="button" class="acoustic-toggle-btn" id="acoustic-btn-silent" onclick="selectAcousticProfile('Silent')">
+                <i data-lucide="volume-x" style="width: 16px; height: 16px;"></i> Silent (Pods &amp; Suites)
+              </button>
+              <button type="button" class="acoustic-toggle-btn" id="acoustic-btn-collab" onclick="selectAcousticProfile('Collaborative')">
+                <i data-lucide="users" style="width: 16px; height: 16px;"></i> Collaborative (Group Labs)
+              </button>
+              <button type="button" class="acoustic-toggle-btn" id="acoustic-btn-amp" onclick="selectAcousticProfile('Amplified')">
+                <i data-lucide="volume-2" style="width: 16px; height: 16px;"></i> Amplified (Lectures &amp; Halls)
               </button>
             </div>
           </div>
@@ -1102,7 +1348,9 @@
 
       <section>
         <div class="section-header-row">
-          <h3 class="section-title" id="search-results-heading">🏛️ Available University Spaces</h3>
+          <h3 class="section-title" id="search-results-heading">
+            <i data-lucide="building-2"></i> Campus spaces
+          </h3>
           <span class="pill-tag tag-neutral" id="results-count-badge">Search to load</span>
         </div>
         <div id="rooms-grid" class="rooms-grid">
@@ -1135,14 +1383,26 @@
     <!-- TAB 3: Student History -->
     <div id="student-tab-history" class="portal-tab-content">
       <div class="section-header-row">
-        <h3 class="section-title">📜 My Booking History</h3>
+        <h3 class="section-title"><i data-lucide="history"></i> My booking history</h3>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button class="nav-tab-btn active" onclick="filterHistory('All')">All</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Scanned')">Scanned / Completed</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Booked')">Booked</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Pending_Permission')">Pending</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Expired')">Expired / No-Show</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Denied')">Denied / Cancelled</button>
+          <button class="nav-tab-btn active" id="hist-tab-All" onclick="filterHistory('All')">
+            All <span id="hist-count-All" class="pill-tag tag-neutral" style="font-size: 0.72rem; padding: 2px 6px;">0</span>
+          </button>
+          <button class="nav-tab-btn" id="hist-tab-Booked" onclick="filterHistory('Booked')">
+            Booked <span id="hist-count-Booked" class="pill-tag tag-emerald" style="font-size: 0.72rem; padding: 2px 6px;">0</span>
+          </button>
+          <button class="nav-tab-btn" id="hist-tab-Scanned" onclick="filterHistory('Scanned')">
+            Scanned <span id="hist-count-Scanned" class="pill-tag tag-blue" style="font-size: 0.72rem; padding: 2px 6px;">0</span>
+          </button>
+          <button class="nav-tab-btn" id="hist-tab-Pending_Permission" onclick="filterHistory('Pending_Permission')">
+            Pending <span id="hist-count-Pending_Permission" class="pill-tag tag-amber" style="font-size: 0.72rem; padding: 2px 6px;">0</span>
+          </button>
+          <button class="nav-tab-btn" id="hist-tab-Expired" onclick="filterHistory('Expired')">
+            Expired <span id="hist-count-Expired" class="pill-tag tag-rose" style="font-size: 0.72rem; padding: 2px 6px;">0</span>
+          </button>
+          <button class="nav-tab-btn" id="hist-tab-Denied" onclick="filterHistory('Denied')">
+            Cancelled <span id="hist-count-Denied" class="pill-tag tag-neutral" style="font-size: 0.72rem; padding: 2px 6px;">0</span>
+          </button>
         </div>
       </div>
       <div id="history-cards-container">
@@ -1169,26 +1429,23 @@
         </div>
         <nav>
           <a class="admin-nav-item active" id="admin-nav-overview" onclick="switchAdminPanel('overview')">
-            <span>📊 Overview</span>
+            <span style="display: flex; align-items: center; gap: 8px;"><i data-lucide="bar-chart-2"></i> Overview</span>
           </a>
           <a class="admin-nav-item" id="admin-nav-pending" onclick="switchAdminPanel('pending')">
-            <span>⏳ Pending Requests</span>
-            <span class="admin-nav-badge" id="admin-pending-count">0</span>
+            <span style="display: flex; align-items: center; gap: 8px;"><i data-lucide="clock"></i> Pending Requests</span>
+            <span class="admin-nav-badge" id="admin-pending-count" style="display: none;">0</span>
           </a>
           <a class="admin-nav-item" id="admin-nav-live-status" onclick="switchAdminPanel('live-status')">
-            <span>🔴 Live Room Status</span>
+            <span style="display: flex; align-items: center; gap: 8px;"><i data-lucide="radio"></i> Live Room Status</span>
           </a>
           <a class="admin-nav-item" id="admin-nav-room-qrs" onclick="switchAdminPanel('room-qrs')">
-            <span>🖨️ Room QR Management</span>
+            <span style="display: flex; align-items: center; gap: 8px;"><i data-lucide="qr-code"></i> Room QR Management</span>
           </a>
           <a class="admin-nav-item" id="admin-nav-spaces" onclick="switchAdminPanel('spaces')">
-            <span>🏛️ Master Reservation Log</span>
+            <span style="display: flex; align-items: center; gap: 8px;"><i data-lucide="file-text"></i> Master Reservation Log</span>
           </a>
           <a class="admin-nav-item" id="admin-nav-profile" onclick="switchAdminPanel('profile')">
-            <span>👤 Admin Profile</span>
-          </a>
-          <a class="admin-nav-item" onclick="signOut()" style="color: var(--accent-rose); margin-top: 1.5rem;">
-            <span>🚪 Sign Out</span>
+            <span style="display: flex; align-items: center; gap: 8px;"><i data-lucide="user"></i> Admin Profile</span>
           </a>
         </nav>
       </aside>
@@ -1217,7 +1474,7 @@
           </div>
 
           <div class="section-header-row">
-            <h3 class="section-title">⚡ Recent Campus Reservations</h3>
+            <h3 class="section-title"><i data-lucide="activity"></i> Recent campus reservations</h3>
           </div>
           <div id="admin-recent-table-box">
             <!-- Render recent items -->
@@ -1227,7 +1484,7 @@
         <!-- PANEL 2: Pending Requests Review with Accompanying Attendees -->
         <div id="admin-panel-pending" style="display: none;">
           <div class="section-header-row">
-            <h3 class="section-title">⏳ Pending Facility Requests</h3>
+            <h3 class="section-title"><i data-lucide="clock"></i> Pending facility requests</h3>
             <span class="pill-tag tag-amber" id="admin-pending-badge">0 Pending</span>
           </div>
           <div id="admin-pending-list">
@@ -1238,7 +1495,7 @@
         <!-- PANEL 3: Master Reservation Log with Cancellation Action -->
         <div id="admin-panel-spaces" style="display: none;">
           <div class="section-header-row">
-            <h3 class="section-title">🏛️ Master Reservation Log & Access Control</h3>
+            <h3 class="section-title"><i data-lucide="file-text"></i> Master reservation log &amp; access control</h3>
           </div>
           <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
             Faculty administrators can inspect all reservations and revoke or cancel any approved/active allocation to immediately release spaces back to students.
@@ -1270,14 +1527,19 @@
         <div id="admin-panel-room-qrs" style="display: none;">
           <div class="section-header-row" style="margin-bottom: 1.25rem;">
             <div>
-              <h3 class="section-title">🖨️ Campus Room QR Codes &amp; Door Plaques</h3>
+              <h3 class="section-title"><i data-lucide="qr-code"></i> Room QR management &amp; door plaques</h3>
               <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 0.25rem;">
                 Official scannable QR codes for classroom &amp; pod doors. Formatted for high-resolution paper printouts to support physical student check-in.
               </p>
             </div>
-            <button class="btn-pill-dark" onclick="loadAdminRoomQRs()" style="font-size: 0.82rem; padding: 0.45rem 1rem;">
-              🔄 Refresh List
-            </button>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn-pill-dark" onclick="printAllPlaques()" style="font-size: 0.82rem; padding: 0.45rem 1rem; gap: 6px;">
+                <i data-lucide="printer" style="width: 14px; height: 14px;"></i> Print All Plaques
+              </button>
+              <button class="btn-pill-outline" onclick="loadAdminRoomQRs()" style="font-size: 0.82rem; padding: 0.45rem 1rem; gap: 6px;">
+                <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Refresh
+              </button>
+            </div>
           </div>
           <div class="table-container" style="background: var(--surface-card); border-radius: var(--radius-card); border: 1px solid var(--border-subtle); overflow-x: auto;">
             <table class="data-table">
@@ -1454,57 +1716,100 @@
        MODAL 3: ROOM QR CODE PLAQUE & HIGH-RESOLUTION PRINT
        ===================================================================== -->
   <div id="room-qr-modal" class="modal-overlay" onclick="handleModalOverlayClick(event, 'room-qr-modal')">
-    <div class="modal-card" style="max-width: 520px; text-align: center;">
+    <div class="modal-card" style="max-width: 480px; max-height: 90vh; overflow-y: auto; text-align: center;">
       <button class="modal-close-btn no-print" onclick="closeRoomQRModal()">&times;</button>
 
       <!-- Printable Plaque Container -->
-      <div id="printable-door-plaque" style="background: #ffffff; border: 3px solid #0f172a; border-radius: 16px; padding: 2rem 1.5rem; margin-bottom: 1.5rem; color: #0f172a; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
-        <div style="text-transform: uppercase; letter-spacing: 1.5px; font-size: 0.76rem; font-weight: 800; color: #475569; margin-bottom: 0.5rem;">
-          Official University Facility Plaque
+      <div id="printable-door-plaque" style="background: #ffffff; border: 2.5px solid #1F2421; border-radius: 12px; padding: 1.5rem 1.25rem; margin-bottom: 1.25rem; color: #1F2421; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+        <div style="text-transform: uppercase; letter-spacing: 1.5px; font-size: 0.72rem; font-weight: 800; color: #58605C; margin-bottom: 0.35rem;">
+          NIIT University &bull; Official Facility Plaque
         </div>
-        <h2 id="plaque-room-name" style="font-size: 1.75rem; color: #0f172a; font-weight: 800; margin-bottom: 0.25rem;">
+        <h2 id="plaque-room-name" style="font-size: 1.5rem; color: #1F2421; font-weight: 800; margin-bottom: 0.25rem;">
           Lecture Hall 101
         </h2>
-        <div style="display: flex; justify-content: center; gap: 0.65rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
-          <span id="plaque-room-cap" style="background: #f1f5f9; color: #334155; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px;">
+        <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+          <span id="plaque-room-cap" class="pill-badge" style="font-size: 0.78rem;">
             Cap: 50 seats
           </span>
-          <span id="plaque-room-acoustic" style="background: #f1f5f9; color: #334155; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px;">
+          <span id="plaque-room-acoustic" class="pill-tag tag-neutral" style="font-size: 0.78rem;">
             Acoustic: Collaborative
           </span>
         </div>
 
-        <!-- High-Resolution QR Container -->
-        <div style="display: inline-block; padding: 16px; background: #ffffff; border: 2px solid #e2e8f0; border-radius: 16px; margin-bottom: 0.85rem;">
-          <img id="plaque-qr-img" src="" alt="Room QR Code" style="width: 230px; height: 230px; display: block; image-rendering: pixelated; margin: 0 auto;">
+        <!-- High-Resolution QR Container (Compact 175x175) -->
+        <div style="display: inline-block; padding: 12px; background: #ffffff; border: 1.5px solid var(--border); border-radius: 12px; margin-bottom: 0.75rem;">
+          <img id="plaque-qr-img" src="" alt="Room QR Code" style="width: 175px; height: 175px; display: block; image-rendering: pixelated; margin: 0 auto;">
         </div>
 
-        <div style="font-size: 0.76rem; color: #64748b; margin-bottom: 1rem; word-break: break-all;" id="plaque-url-text">
-          https://.../
+        <!-- Clean Official Notice (Hides messy temporary trycloudflare URL) -->
+        <div style="font-size: 0.75rem; color: #58605C; margin-bottom: 0.85rem;" id="plaque-url-text">
+          Scan with phone camera to check in or view room schedule
         </div>
 
-        <div style="border-top: 1px dashed #cbd5e1; padding-top: 1rem; text-align: left; font-size: 0.82rem; color: #334155; line-height: 1.5;">
-          <strong style="color: #0f172a; display: block; margin-bottom: 0.35rem;">📱 Student Attendance Check-In Instructions:</strong>
-          <ol style="margin: 0; padding-left: 1.2rem;">
-            <li>Scan this door QR with your device camera or Campus Hub app.</li>
-            <li>Confirm physical check-in within 15 minutes of scheduled start.</li>
+        <div style="border-top: 1px dashed #cbd5e1; padding-top: 0.85rem; text-align: left; font-size: 0.8rem; color: #334155; line-height: 1.45;">
+          <strong style="color: #0f172a; display: flex; align-items: center; gap: 5px; margin-bottom: 0.25rem;">
+            <i data-lucide="qr-code" style="width: 14px; height: 14px;"></i> Attendance check-in instructions:
+          </strong>
+          <ol style="margin: 0; padding-left: 1.15rem;">
+            <li>Scan with device camera or click "Scan QR" in your Student Dashboard.</li>
+            <li>Confirm physical attendance within 15 minutes of scheduled start.</li>
             <li>Unverified rooms are auto-released to students on standby queue.</li>
           </ol>
         </div>
       </div>
 
       <div style="display: flex; gap: 0.75rem; justify-content: center;" class="no-print">
-        <button class="btn-pill-dark" onclick="window.print()" style="padding: 0.65rem 1.5rem; display: inline-flex; align-items: center; gap: 8px;">
-          🖨️ Print QR Sheet
+        <button class="btn-pill-dark" onclick="window.print()" style="padding: 0.6rem 1.4rem; display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="printer" style="width: 16px; height: 16px;"></i> Print Door Plaque
         </button>
-        <button class="btn-pill-outline" onclick="closeRoomQRModal()" style="padding: 0.65rem 1.25rem;">
+        <button class="btn-pill-outline" onclick="closeRoomQRModal()" style="padding: 0.6rem 1.25rem;">
           Close
         </button>
       </div>
     </div>
   </div>
 
-  <div id="toast-container"></div>
+  <!-- =====================================================================
+       MODAL 4: REAL CAMERA QR SCANNER (html5-qrcode CDN)
+       ===================================================================== -->
+  <div id="camera-scanner-modal" class="modal-overlay" onclick="handleModalOverlayClick(event, 'camera-scanner-modal')">
+    <div class="modal-card" style="max-width: 460px; max-height: 90vh; overflow-y: auto; text-align: center;">
+      <button class="modal-close-btn no-print" onclick="closeCameraScanner()">&times;</button>
+
+      <div style="margin-bottom: 1rem;">
+        <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(31, 94, 74, 0.1); color: var(--btn-dark); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem;">
+          <i data-lucide="camera" style="width: 22px; height: 22px;"></i>
+        </div>
+        <h3 style="font-size: 1.25rem; color: var(--text-primary); margin-bottom: 0.25rem;">Scan Door QR Code</h3>
+        <p style="font-size: 0.82rem; color: var(--text-secondary);" id="camera-scanner-room-hint">
+          Point your device camera at the room plaque QR code on the door.
+        </p>
+      </div>
+
+      <!-- Real Camera Video Viewport -->
+      <div id="qr-camera-reader" style="width: 100%; border-radius: 12px; overflow: hidden; background: #0F172A; min-height: 240px; display: flex; align-items: center; justify-content: center; color: #FFFFFF; position: relative;">
+        <div style="padding: 2rem; color: #94A3B8; font-size: 0.85rem;">
+          <i data-lucide="loader" style="width: 24px; height: 24px; animation: spin 1s linear infinite; margin-bottom: 8px;"></i>
+          <div>Starting camera viewport...</div>
+        </div>
+      </div>
+
+      <div id="camera-scanner-status" style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.75rem; min-height: 20px;">
+        Align the QR code within the frame to verify attendance.
+      </div>
+
+      <div style="margin-top: 1.25rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;" class="no-print">
+        <button class="btn-pill-outline" onclick="verifyDirectlyFallback()" id="btn-camera-fallback" style="font-size: 0.82rem; padding: 0.45rem 1rem;">
+          Verify check-in directly
+        </button>
+        <button class="btn-pill-dark" onclick="closeCameraScanner()" style="font-size: 0.82rem; padding: 0.45rem 1.25rem;">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;"></div>
 
   <script>
     const AppState = {
@@ -1576,24 +1881,35 @@
       }
     }
 
+    function getRoomName(r) {
+      if (!r) return 'Campus Room';
+      if (r.space && r.space.name) return r.space.name;
+      if (r.room_name && r.room_name !== 'undefined') return r.room_name;
+      if (r.space_name && r.space_name !== 'undefined') return r.space_name;
+      return 'Campus Room';
+    }
+
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
       toast.className = `toast-msg ${type}`;
       
-      let icon = 'ℹ️';
-      if (type === 'success') icon = '✅';
-      if (type === 'error') icon = '⚠️';
+      let icon = 'info';
+      if (type === 'success') icon = 'check-circle-2';
+      if (type === 'error') icon = 'alert-triangle';
 
-      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+      toast.innerHTML = `<i data-lucide="${icon}" style="width: 18px; height: 18px;"></i> <span>${message}</span>`;
       container.appendChild(toast);
+      if (window.lucide) {
+        lucide.createIcons({ root: toast });
+      }
 
       setTimeout(() => {
         toast.style.opacity = '0';
         toast.style.transform = 'translateY(10px)';
         toast.style.transition = 'all 0.3s ease';
         setTimeout(() => toast.remove(), 300);
-      }, 4500);
+      }, 3000);
     }
 
     // Clean human-readable API request handler
@@ -1648,6 +1964,7 @@
     // =====================================================================
     function openGoogleModal() {
       document.getElementById('google-modal').classList.add('open');
+      if (window.lucide) lucide.createIcons();
     }
 
     function closeGoogleModal() {
@@ -1665,8 +1982,27 @@
       }
     }
 
+    function toggleProfileDropdown(e) {
+      if (e) e.stopPropagation();
+      const dropdown = document.getElementById('student-profile-dropdown');
+      if (dropdown) dropdown.classList.toggle('open');
+    }
+
+    window.addEventListener('click', () => {
+      const dropdown = document.getElementById('student-profile-dropdown');
+      if (dropdown && dropdown.classList.contains('open')) {
+        dropdown.classList.remove('open');
+      }
+    });
+
     async function loginWithGoogle(email, role, displayName) {
       try {
+        // Clear previous user silently if switching accounts (Fix double popup)
+        AppState.token = null;
+        AppState.user = null;
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user_data');
+
         const payload = {
           dev_bypass_email: email,
           dev_role: role
@@ -1707,7 +2043,7 @@
       loginWithGoogle(email, role, email.split('@')[0]);
     }
 
-    async function signOut() {
+    async function signOut(silent = false) {
       try {
         await apiRequest('/api/auth/logout', { method: 'POST' }).catch(() => {});
       } finally {
@@ -1717,7 +2053,9 @@
         localStorage.removeItem('user_data');
         localStorage.removeItem('active_view');
         window.location.hash = '';
-        showToast('Successfully signed out.', 'info');
+        if (!silent) {
+          showToast('Successfully signed out.', 'info');
+        }
         showView('landing');
         syncUIState();
       }
@@ -1737,6 +2075,7 @@
       document.getElementById('view-landing').style.display = viewName === 'landing' ? 'block' : 'none';
       document.getElementById('view-student').style.display = viewName === 'student' ? 'block' : 'none';
       document.getElementById('view-admin').style.display = viewName === 'admin' ? 'block' : 'none';
+      if (window.lucide) lucide.createIcons();
     }
 
     function syncUIState() {
@@ -1764,17 +2103,31 @@
       } else {
         studentNav.style.display = 'inline-flex';
         adminNav.style.display = 'none';
-        document.getElementById('student-header-name').textContent = AppState.user.name || 'Student';
+        
+        const userName = AppState.user.name || 'Student';
+        document.getElementById('student-header-name').textContent = userName;
+        const dropdownName = document.getElementById('dropdown-user-name');
+        if (dropdownName) dropdownName.textContent = userName;
+        const dropdownEmail = document.getElementById('dropdown-user-email');
+        if (dropdownEmail) dropdownEmail.textContent = AppState.user.email || 'student@st.niituniversity.in';
+
+        // Initials
+        const initials = userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'ST';
+        const initElem = document.getElementById('student-avatar-initials');
+        if (initElem) initElem.textContent = initials;
+
         document.getElementById('student-header-bookings').textContent = `${AppState.user.total_bookings || 0} Bookings`;
         const urgenciesUsed = AppState.user.urgent_requests_used || 0;
         const urgenciesRemaining = Math.max(0, 3 - urgenciesUsed);
         const urgElem = document.getElementById('student-header-urgencies');
         if (urgElem) {
-          urgElem.textContent = `${urgenciesRemaining}/3 Urgencies`;
+          urgElem.textContent = `${urgenciesRemaining}/3 left`;
           urgElem.className = urgenciesRemaining === 0 ? 'pill-tag tag-neutral' : 'pill-tag tag-rose';
         }
         showView('student');
       }
+      if (window.lucide) lucide.createIcons();
+    }
     }
 
     // =====================================================================
@@ -1808,6 +2161,55 @@
     }
 
     // =====================================================================
+    // QUICK-PICK SLOTS & ACOUSTIC TOGGLES
+    // =====================================================================
+    function selectAcousticProfile(profile) {
+      document.getElementById('search-acoustic').value = profile;
+      document.querySelectorAll('.acoustic-toggle-btn').forEach(btn => btn.classList.remove('active'));
+      if (!profile) {
+        document.getElementById('acoustic-btn-all')?.classList.add('active');
+      } else if (profile === 'Silent') {
+        document.getElementById('acoustic-btn-silent')?.classList.add('active');
+      } else if (profile === 'Collaborative') {
+        document.getElementById('acoustic-btn-collab')?.classList.add('active');
+      } else if (profile === 'Amplified') {
+        document.getElementById('acoustic-btn-amp')?.classList.add('active');
+      }
+      handleSearch();
+    }
+
+    function applyQuickSlot(slotType) {
+      const now = new Date();
+      let start = new Date(now);
+      let end = new Date(now);
+
+      if (slotType === 'now') {
+        // Current time rounded to next 5 minutes
+        start.setMinutes(Math.ceil(start.getMinutes() / 5) * 5, 0, 0);
+        end = new Date(start.getTime() + 60 * 60000);
+      } else if (slotType === 'next1hr') {
+        // Starts 1 hour from now
+        start = new Date(now.getTime() + 60 * 60000);
+        start.setMinutes(0, 0, 0);
+        end = new Date(start.getTime() + 60 * 60000);
+      } else if (slotType === 'tomorrow') {
+        // Tomorrow 9:00 AM to 10:00 AM
+        start.setDate(start.getDate() + 1);
+        start.setHours(9, 0, 0, 0);
+        end = new Date(start.getTime() + 60 * 60000);
+      }
+
+      const startInput = document.getElementById('search-start');
+      const endInput = document.getElementById('search-end');
+      if (startInput && endInput) {
+        startInput.value = toLocalISOString(start);
+        endInput.value = toLocalISOString(end);
+        handleStartTimeChange();
+        handleSearch();
+      }
+    }
+
+    // =====================================================================
     // REQUIREMENT 2: SIMULTANEOUS MULTI-ERROR SEARCH VALIDATION
     // =====================================================================
     async function handleSearch(e) {
@@ -1820,7 +2222,7 @@
       const errorBanner = document.getElementById('search-error-banner');
 
       // Clear all existing error highlights
-      [startInput, endInput, capacityInput, acousticSelect].forEach(el => {
+      [startInput, endInput, capacityInput].forEach(el => {
         el.classList.remove('input-error');
       });
       errorBanner.style.display = 'none';
@@ -1831,7 +2233,7 @@
       const startVal = startInput.value;
       const endVal = endInput.value;
       const capacityVal = parseInt(capacityInput.value, 10);
-      const acousticVal = acousticSelect.value;
+      const acousticVal = acousticSelect ? acousticSelect.value : '';
 
       // 1. Date/Time checks
       if (!startVal) {
@@ -1867,21 +2269,16 @@
         errors.push("Number of people cannot exceed the maximum limit of 100.");
       }
 
-      // 3. Acoustic Profile Check
-      if (!acousticVal) {
-        acousticSelect.classList.add('input-error');
-        errors.push("Please select an Acoustic Profile (Silent, Collaborative, or Amplified).");
-      }
-
       // If any errors exist, show ALL simultaneously in one bulleted banner
       if (errors.length > 0) {
         errorBanner.innerHTML = `
-          <strong>⚠️ Please resolve the following errors:</strong>
+          <strong><i data-lucide="alert-triangle" style="width: 16px; height: 16px;"></i> Please resolve the following errors:</strong>
           <ul>
             ${errors.map(err => `<li>${err}</li>`).join('')}
           </ul>
         `;
         errorBanner.style.display = 'block';
+        if (window.lucide) lucide.createIcons({ root: errorBanner });
         errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         return;
       }
@@ -1907,6 +2304,28 @@
       }
     }
 
+    async function joinStandbyWaitlist(spaceId, roomName) {
+      if (!AppState.token) {
+        openGoogleModal();
+        return;
+      }
+      try {
+        const payload = {
+          space_id: spaceId,
+          requested_start: AppState.searchParams.startTime,
+          requested_end: AppState.searchParams.endTime
+        };
+        const res = await apiRequest('/api/standby/join', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showToast(`Joined Standby Waitlist for ${roomName || 'the room'}! You will receive a 3-min flash claim notification if auto-released.`, 'success');
+        switchStudentTab('dashboard');
+      } catch (err) {
+        console.error('Join standby error:', err);
+      }
+    }
+
     function renderSearchResults(data) {
       const container = document.getElementById('rooms-grid');
       const badge = document.getElementById('results-count-badge');
@@ -1914,21 +2333,24 @@
       aiBox.style.display = 'none';
 
       const rooms = Array.isArray(data) ? data : (data.available_rooms || []);
+      const occupiedRooms = (!Array.isArray(data) && data.occupied_rooms) ? data.occupied_rooms : [];
       const mlSlots = (!Array.isArray(data) && data.ml_suggested_slots) ? data.ml_suggested_slots : [];
 
-      badge.textContent = `${rooms.length} Spaces Available`;
+      badge.textContent = `${rooms.length} available · ${occupiedRooms.length} in use`;
       container.innerHTML = '';
 
-      if (rooms.length === 0) {
+      if (rooms.length === 0 && occupiedRooms.length === 0) {
         container.innerHTML = `
-          <div style="grid-column: 1 / -1; background: var(--surface); border: 1.5px dashed var(--border); border-radius: var(--radius-card); padding: 3rem; text-align: center;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🏛️</div>
-            <h3 style="font-size: 1.25rem; color: var(--text-primary); margin-bottom: 0.5rem;">No Directly Available Rooms</h3>
-            <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 1.5rem; font-size: 0.92rem;">
+          <div style="grid-column: 1 / -1; background: var(--surface); border: 1.5px dashed var(--border); border-radius: 12px; padding: 3rem 1.5rem; text-align: center;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: #F3F4F6; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.75rem;">
+              <i data-lucide="building-2" style="width: 24px; height: 24px;"></i>
+            </div>
+            <h3 style="font-size: 1.25rem; color: var(--text-primary); margin-bottom: 0.35rem;">No directly matching rooms found</h3>
+            <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 1.5rem; font-size: 0.9rem;">
               All university facilities matching this capacity and acoustic profile are currently reserved during this timeframe.
             </p>
             <button class="btn-pill-dark" onclick="triggerAISlotSuggester(${JSON.stringify(mlSlots).replace(/"/g, '&quot;')})">
-              🤖 Consult AI Smart Slot Suggester
+              <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> Consult AI smart slot suggester
             </button>
           </div>
         `;
@@ -1936,9 +2358,11 @@
         if (mlSlots.length > 0) {
           triggerAISlotSuggester(mlSlots);
         }
+        if (window.lucide) lucide.createIcons();
         return;
       }
 
+      // 1. Render Available Rooms First
       rooms.forEach(room => {
         let acousticTag = 'tag-neutral';
         if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
@@ -1951,27 +2375,79 @@
         card.innerHTML = `
           <div>
             <div class="room-card-header">
-              <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
-              <span class="pill-badge" style="font-size: 0.75rem;">Cap: ${room.capacity} seats</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block;"></span>
+                <span class="pill-tag tag-emerald">Available</span>
+                <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
+              </div>
+              <span class="pill-badge" style="font-size: 0.75rem;">${room.capacity} seats</span>
             </div>
             <h3 class="room-title">${room.name}</h3>
             <div class="room-specs">
-              <span class="pill-tag tag-neutral">High-Speed Wi-Fi</span>
-              <span class="pill-tag tag-neutral">Smart Screen & Audio</span>
-              <span class="pill-tag tag-emerald">● Instant Allocation &bull; Auto-Approved</span>
+              <span class="pill-tag tag-neutral"><i data-lucide="wifi" style="width: 12px; height: 12px;"></i> Wi-Fi</span>
+              <span class="pill-tag tag-neutral"><i data-lucide="tv" style="width: 12px; height: 12px;"></i> Smart screen</span>
+              <span class="pill-tag tag-emerald" style="font-size: 0.72rem;">Instant Allocation &bull; Auto-Approved</span>
             </div>
           </div>
-          <div class="room-card-footer">
-            <span style="font-size: 0.85rem; color: #16a34a; font-weight: 500;">
-              Instant Allocation &bull; Auto-Approved
+          <div class="room-card-footer" style="padding-top: 1rem; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 0.82rem; color: #16a34a; font-weight: 600;">
+              Auto-Approved
             </span>
-            <button class="btn-pill-dark" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 8px;" onclick='openBookingModal(${JSON.stringify(room)})'>
-              Book Room &rarr;
+            <button class="btn-pill-dark" style="font-size: 0.85rem; padding: 0.5rem 1.25rem;" onclick='openBookingModal(${JSON.stringify(room)}, false)'>
+              <i data-lucide="calendar-plus" style="width: 16px; height: 16px;"></i> Book Room
             </button>
           </div>
         `;
         container.appendChild(card);
       });
+
+      // 2. Render Occupied / Reserved Rooms with Standby & Urgent Override Actions!
+      occupiedRooms.forEach(room => {
+        let acousticTag = 'tag-neutral';
+        if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
+        if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
+        if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
+
+        const card = document.createElement('div');
+        card.className = 'room-card';
+        card.style.background = '#FFFFFF';
+        card.style.border = '1px solid #E5E0D8';
+
+        card.innerHTML = `
+          <div>
+            <div class="room-card-header">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: #dc2626; display: inline-block;"></span>
+                <span class="pill-tag tag-rose">Occupied / In Use</span>
+                <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
+              </div>
+              <span class="pill-badge" style="font-size: 0.75rem;">${room.capacity} seats</span>
+            </div>
+            <h3 class="room-title" style="color: var(--text-primary);">${room.name}</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+              Currently reserved for requested slot. You can join standby for auto-release or request an urgent override.
+            </p>
+          </div>
+          <div class="room-card-footer" style="padding-top: 0.85rem; border-top: 1px solid var(--border-subtle); display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
+            <button class="btn-pill-outline" style="font-size: 0.82rem; padding: 0.45rem 0.95rem; gap: 6px;" onclick='joinStandbyWaitlist("${room.id}", "${room.name}")'>
+              <i data-lucide="clock" style="width: 14px; height: 14px;"></i> Join Standby Waitlist
+            </button>
+            <button class="btn-pill-outline" style="border-color: #f87171; color: #dc2626; font-size: 0.82rem; padding: 0.45rem 0.95rem; gap: 6px;" onclick='openBookingModal(${JSON.stringify(room)}, true)'>
+              <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i> Urgent Override
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // If any ML slots available and 0 free rooms, show AI suggestion box
+      if (rooms.length === 0 && mlSlots.length > 0) {
+        triggerAISlotSuggester(mlSlots);
+      }
+
+      if (window.lucide) {
+        lucide.createIcons();
+      }
     }
 
     function triggerAISlotSuggester(slots = []) {
@@ -1980,20 +2456,20 @@
 
       if (slots && slots.length > 0) {
         aiBox.innerHTML = `
-          <div style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border: 1.5px solid #F59E0B; border-radius: var(--radius-card); padding: 1.75rem;">
-            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
-              <span style="font-size: 1.5rem;">🤖</span>
+          <div style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border: 1.5px solid #F59E0B; border-radius: 12px; padding: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.35rem; color: #92400E;"><i data-lucide="sparkles"></i></span>
               <h3 style="font-size: 1.15rem; color: #92400E;">AI Smart Slot Optimization</h3>
             </div>
-            <p style="font-size: 0.9rem; color: #78350F; line-height: 1.5; margin-bottom: 1.25rem;">
+            <p style="font-size: 0.88rem; color: #78350F; line-height: 1.5; margin-bottom: 1.25rem;">
               Our predictive ML engine evaluated campus traffic and identified optimal alternative slots with low congestion:
             </p>
             <div style="display: grid; gap: 0.75rem;">
               ${slots.map(s => `
-                <div style="background: #FFFFFF; border: 1px solid #FCD34D; border-radius: 12px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="background: #FFFFFF; border: 1px solid #FCD34D; border-radius: 12px; padding: 0.85rem 1.15rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
                   <div>
-                    <strong>🕒 ${formatDateTime(s.suggested_start || s.start_time)} - ${formatDateTime(s.suggested_end || s.end_time)}</strong>
-                    <div style="font-size: 0.8rem; color: #92400E;">
+                    <strong><i data-lucide="clock" style="width: 14px; height: 14px;"></i> ${formatDateTime(s.suggested_start || s.start_time)} - ${formatDateTime(s.suggested_end || s.end_time)}</strong>
+                    <div style="font-size: 0.8rem; color: #92400E; margin-top: 3px;">
                       ${s.reason || `${Math.round(s.success_probability * 100)}% Success Probability &bull; ${s.available_spaces ? s.available_spaces.length : s.available_spaces_count} Rooms Free`}
                     </div>
                   </div>
@@ -2005,6 +2481,7 @@
             </div>
           </div>
         `;
+        if (window.lucide) lucide.createIcons({ root: aiBox });
       }
     }
 
@@ -2020,7 +2497,7 @@
     // =====================================================================
     let attendeeCardCount = 0;
 
-    function openBookingModal(room) {
+    function openBookingModal(room, isUrgentPrecheck = false) {
       AppState.selectedSpace = room;
       const initialCapacity = AppState.searchParams.capacity || 1;
       const accompanyingCount = Math.max(0, initialCapacity - 1);
@@ -2049,15 +2526,21 @@
       const remainingUrgent = Math.max(0, 3 - usedUrgent);
 
       if (urgentCheckbox && urgentText) {
-        urgentCheckbox.checked = false;
+        urgentCheckbox.checked = isUrgentPrecheck;
         if (remainingUrgent <= 0) {
           urgentCheckbox.disabled = true;
+          urgentCheckbox.checked = false;
           urgentText.textContent = '(0 of 3 remaining - Monthly Quota Exhausted)';
         } else {
           urgentCheckbox.disabled = false;
           urgentText.textContent = `(${remainingUrgent} of 3 remaining this month)`;
         }
       }
+      updateUrgentNotice();
+      updatePartySizeDisplay();
+      document.getElementById('booking-modal').classList.add('open');
+      if (window.lucide) lucide.createIcons();
+    }
       updateUrgentNotice();
 
       updatePartySizeDisplay();
@@ -2272,6 +2755,140 @@
     // =====================================================================
     // STUDENT DASHBOARD & 15-MINUTE QR CHECK-IN
     // =====================================================================
+    let checkinTimerInterval = null;
+    let liveStatusAutoRefreshTimer = null;
+    let html5QrCodeScanner = null;
+    let activeScanningTarget = null;
+
+    function formatTimeRangeCompact(startIso, endIso) {
+      if (!startIso || !endIso) return '';
+      const s = new Date(startIso);
+      const e = new Date(endIso);
+      const dateStr = s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const startStr = s.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const endStr = e.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      return `${dateStr} &bull; ${startStr}&ndash;${endStr}`;
+    }
+
+    function startCheckinCountdown(startTimeIso) {
+      if (checkinTimerInterval) clearInterval(checkinTimerInterval);
+      const updateTimer = () => {
+        const timerElem = document.getElementById('checkin-live-countdown');
+        if (!timerElem) return;
+        const startTime = new Date(startTimeIso).getTime();
+        const graceDeadline = startTime + 15 * 60 * 1000;
+        const now = Date.now();
+        const diff = graceDeadline - now;
+
+        if (diff <= 0) {
+          timerElem.textContent = 'Grace window ended';
+          timerElem.style.color = 'var(--accent-rose)';
+          clearInterval(checkinTimerInterval);
+        } else {
+          const mins = Math.floor(diff / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          timerElem.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs} left`;
+          timerElem.style.color = mins < 5 ? 'var(--accent-rose)' : 'var(--accent-amber)';
+        }
+      };
+      updateTimer();
+      checkinTimerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function addToCalendar(res) {
+      const roomName = getRoomName(res);
+      const title = encodeURIComponent(`Room Reservation: ${roomName}`);
+      const details = encodeURIComponent(`Purpose: ${res.purpose || 'Campus Space Booking'}\nStatus: ${res.status}`);
+      const location = encodeURIComponent(`${roomName} - NIIT University`);
+      const startUtc = new Date(res.start_time).toISOString().replace(/-|:|\.\d\d\d/g, '');
+      const endUtc = new Date(res.end_time).toISOString().replace(/-|:|\.\d\d\d/g, '');
+      const calUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startUtc}/${endUtc}&details=${details}&location=${location}`;
+      window.open(calUrl, '_blank');
+    }
+
+    async function cancelStudentReservation(reservationId) {
+      if (!confirm('Are you sure you want to cancel this booking? This will immediately release the room for other students.')) return;
+      try {
+        await apiRequest(`/api/admin/reservations/${reservationId}/cancel`, { method: 'POST' });
+        showToast('Reservation cancelled and released.', 'info');
+        loadStudentDashboard();
+      } catch (err) {
+        console.error('Cancel booking error:', err);
+      }
+    }
+
+    // =====================================================================
+    // REAL CAMERA QR SCANNER (html5-qrcode CDN)
+    // =====================================================================
+    async function openCameraScanner(reservationId, expectedSpaceId) {
+      activeScanningTarget = { reservationId, expectedSpaceId };
+      const modal = document.getElementById('camera-scanner-modal');
+      modal.classList.add('open');
+      const statusElem = document.getElementById('camera-scanner-status');
+      statusElem.textContent = 'Requesting camera access... Please grant permission if prompted.';
+      statusElem.style.color = 'var(--text-secondary)';
+
+      try {
+        if (html5QrCodeScanner) {
+          try { await html5QrCodeScanner.stop(); } catch (e) {}
+          html5QrCodeScanner = null;
+        }
+
+        html5QrCodeScanner = new Html5Qrcode("qr-camera-reader");
+        await html5QrCodeScanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
+          async (decodedText) => {
+            console.log("Decoded QR:", decodedText);
+            statusElem.textContent = 'QR Code detected! Verifying physical door check-in...';
+            statusElem.style.color = 'var(--accent-emerald)';
+
+            try {
+              await html5QrCodeScanner.stop();
+              html5QrCodeScanner = null;
+            } catch (e) {}
+
+            closeCameraScanner();
+
+            // Verify room match if spaceId provided
+            if (activeScanningTarget && activeScanningTarget.expectedSpaceId) {
+              const expected = String(activeScanningTarget.expectedSpaceId).toLowerCase();
+              const scanned = String(decodedText).toLowerCase();
+              if (!scanned.includes(expected)) {
+                showToast('Scanned QR code is for a different room! Please scan the QR plaque on the correct door.', 'error');
+                return;
+              }
+            }
+
+            await verifyQRCheckIn(activeScanningTarget.reservationId);
+          },
+          (error) => {
+            // Frame scan loop
+          }
+        );
+        statusElem.textContent = 'Camera active. Frame the door plaque QR code.';
+      } catch (err) {
+        console.warn('Camera error:', err);
+        statusElem.innerHTML = `<span style="color: var(--accent-rose);">Camera unavailable: ${err.message || 'Permission denied'}. You can verify directly below.</span>`;
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function closeCameraScanner() {
+      if (html5QrCodeScanner) {
+        try { await html5QrCodeScanner.stop(); } catch (e) {}
+        html5QrCodeScanner = null;
+      }
+      document.getElementById('camera-scanner-modal')?.classList.remove('open');
+    }
+
+    async function verifyDirectlyFallback() {
+      if (activeScanningTarget && activeScanningTarget.reservationId) {
+        await closeCameraScanner();
+        await verifyQRCheckIn(activeScanningTarget.reservationId);
+      }
+    }
+
     async function loadStudentDashboard() {
       if (!AppState.token) return;
       try {
@@ -2305,61 +2922,91 @@
         flashContainer.innerHTML = `
           <div class="flash-claim-card">
             <div>
-              <span class="pill-tag tag-amber" style="margin-bottom: 0.5rem;">⚡ 3-MINUTE FLASH CLAIM OPPORTUNITY</span>
+              <span class="pill-tag tag-amber" style="margin-bottom: 0.5rem;"><i data-lucide="zap" style="width: 14px; height: 14px;"></i> 3-Minute Flash Claim Opportunity</span>
               <h3 style="color: #92400E; font-size: 1.25rem;">A Reserved Room Has Auto-Released!</h3>
-              <p style="color: #78350F; font-size: 0.9rem; margin-top: 0.25rem;">
+              <p style="color: #78350F; font-size: 0.88rem; margin-top: 0.25rem;">
                 A no-show reservation in your standby queue expired. You have <strong>${minsLeft} minute(s)</strong> to claim this room before it rotates.
               </p>
             </div>
-            <button class="btn-pill-dark" style="background: #D97706; padding: 0.75rem 1.75rem; white-space: nowrap;" onclick="claimStandbyOffer('${activeClaim.id}')">
-              ⚡ Flash Claim Room Now
+            <button class="btn-pill-dark" style="background: #D97706; padding: 0.75rem 1.75rem; white-space: nowrap; gap: 6px;" onclick="claimStandbyOffer('${activeClaim.id}')">
+              <i data-lucide="zap" style="width: 16px; height: 16px;"></i> Flash Claim Room Now
             </button>
           </div>
         `;
       }
 
-      // 2. Active QR Booking Card
+      // 2. Active QR Booking Card with Live 15-Minute Countdown
       const activeContainer = document.getElementById('active-booking-container');
       const bookedReservation = (data.active_bookings || []).find(b => b.status === 'Booked');
 
       if (bookedReservation) {
-        const qrData = `CAMPUS_CHECKIN:${bookedReservation.id}:${bookedReservation.user_id}`;
+        const qrData = `https://campus.niituniversity.in/#scan?space_id=${bookedReservation.space_id}`;
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`;
+        const roomName = getRoomName(bookedReservation);
+
+        // Attendees initial circles
+        const attendees = bookedReservation.accompanying_students || [];
+        const circlesHtml = attendees.map(s => {
+          const init = (s.name || s.full_name || 'S').substring(0, 2).toUpperCase();
+          return `<span title="${s.name || s.full_name}" style="width: 26px; height: 26px; border-radius: 50%; background: #1F5E4A; color: #FFFFFF; font-size: 0.7rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #FFFFFF; margin-left: -6px;">${init}</span>`;
+        }).join('');
 
         activeContainer.innerHTML = `
           <div class="checkin-hero-card">
             <div class="checkin-info">
-              <span class="pill-tag tag-blue" style="margin-bottom: 0.65rem;">ACTION REQUIRED &bull; 15-MIN PHYSICAL CHECK-IN</span>
-              <h3>${bookedReservation.space_name}</h3>
-              <p style="color: var(--text-secondary); margin-bottom: 0.75rem; font-size: 0.95rem;">
-                🕒 <strong>Slot:</strong> ${formatDateTime(bookedReservation.start_time)} - ${formatDateTime(bookedReservation.end_time)}
-              </p>
-              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
-                🎯 <strong>Purpose:</strong> ${bookedReservation.purpose}
-              </p>
-
-              ${bookedReservation.accompanying_count > 0 ? `
-                <div class="attendees-summary">
-                  👥 <strong>Group Reservation (${bookedReservation.accompanying_count + 1} People):</strong> Includes ${bookedReservation.accompanying_count} verified accompanying attendees.
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.65rem; flex-wrap: wrap;">
+                <span class="pill-tag tag-blue"><i data-lucide="clock" style="width: 14px; height: 14px;"></i> Action Required &bull; 15-Min Check-In</span>
+                <span class="pill-tag tag-amber" style="font-weight: 700;">
+                  ⏳ <span id="checkin-live-countdown">15:00 left</span>
+                </span>
+              </div>
+              <h3 style="font-size: 1.5rem; color: var(--text-primary); font-weight: 800; margin-bottom: 0.4rem;">${roomName}</h3>
+              
+              <div style="display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="calendar" style="width: 15px; height: 15px; color: var(--text-muted);"></i>
+                  <strong>Time:</strong> ${formatTimeRangeCompact(bookedReservation.start_time, bookedReservation.end_time)}
                 </div>
-              ` : ''}
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="target" style="width: 15px; height: 15px; color: var(--text-muted);"></i>
+                  <strong>Purpose:</strong> ${bookedReservation.purpose}
+                </div>
+                ${attendees.length > 0 ? `
+                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                    <i data-lucide="users" style="width: 15px; height: 15px; color: var(--text-muted);"></i>
+                    <span>Party: 1 requester + ${attendees.length} accompanying</span>
+                    <div style="display: inline-flex; margin-left: 4px;">${circlesHtml}</div>
+                  </div>
+                ` : ''}
+              </div>
 
-              <div style="margin-top: 1.5rem;">
-                <button class="btn-pill-dark" onclick="verifyQRCheckIn('${bookedReservation.id}')">
-                  📷 Scan QR / Verify Physical Check-In
+              <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 1.25rem;">
+                <button class="btn-pill-dark" onclick="openCameraScanner('${bookedReservation.id}', '${bookedReservation.space_id}')" style="gap: 8px;">
+                  <i data-lucide="camera" style="width: 16px; height: 16px;"></i> Scan Door QR Code
+                </button>
+                <button class="btn-pill-outline" onclick='addToCalendar(${JSON.stringify(bookedReservation).replace(/'/g, "&#39;")})' style="gap: 6px;">
+                  <i data-lucide="calendar-plus" style="width: 16px; height: 16px;"></i> Add to Calendar
+                </button>
+                <button class="btn-pill-outline" style="border-color: #fca5a5; color: #b91c1c; gap: 6px;" onclick="cancelStudentReservation('${bookedReservation.id}')">
+                  <i data-lucide="x-circle" style="width: 16px; height: 16px;"></i> Cancel Booking
                 </button>
               </div>
             </div>
             <div class="qr-container">
               <img src="${qrUrl}" alt="Check-In QR Code">
-              <div class="qr-timer">⏱️ 15-Min Grace Window Active</div>
+              <div class="qr-timer" style="font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="shield-check" style="width: 14px; height: 14px;"></i> Scan at physical door
+              </div>
             </div>
           </div>
         `;
+        startCheckinCountdown(bookedReservation.start_time);
       } else {
+        if (checkinTimerInterval) clearInterval(checkinTimerInterval);
         activeContainer.innerHTML = `
-          <div style="background: var(--surface-card); border: 1px dashed var(--border); border-radius: var(--radius-card); padding: 2rem; text-align: center;">
-            <p style="color: var(--text-secondary); font-size: 0.95rem;">
+          <div style="background: #FFFFFF; border: 1.5px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center;">
+            <div style="color: var(--text-muted); margin-bottom: 0.5rem;"><i data-lucide="calendar-check-2" style="width: 32px; height: 32px;"></i></div>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; font-weight: 500;">
               No active reservations requiring physical check-in right now.
             </p>
           </div>
@@ -2380,29 +3027,48 @@
           if (res.status === 'Booked') statusTag = 'tag-blue';
           if (res.status === 'Scanned') statusTag = 'tag-emerald';
 
+          const roomTitle = getRoomName(res);
+          const attendees = res.accompanying_students || [];
+          const circles = attendees.map(s => {
+            const init = (s.name || s.full_name || 'S').substring(0, 2).toUpperCase();
+            return `<span title="${s.name || s.full_name}" style="width: 22px; height: 22px; border-radius: 50%; background: #1F5E4A; color: #FFFFFF; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #FFFFFF; margin-left: -5px;">${init}</span>`;
+          }).join('');
+
           const card = document.createElement('div');
           card.className = 'history-card';
+          card.style.background = '#FFFFFF';
           card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
               <div>
-                <span class="pill-tag ${statusTag}">${res.status.replace('_', ' ')}</span>
-                ${res.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
-                <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${res.space_name}</h4>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="pill-tag ${statusTag}">${res.status.replace('_', ' ')}</span>
+                  ${res.is_urgent ? '<span class="pill-tag tag-rose" style="font-weight: 700;"><i data-lucide="flag" style="width: 12px; height: 12px;"></i> URGENT</span>' : ''}
+                </div>
+                <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary); font-weight: 700;">${roomTitle}</h4>
               </div>
-              <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.created_at)}</span>
+              <div style="display: flex; gap: 0.45rem;">
+                <button class="btn-pill-outline" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; gap: 4px;" onclick='addToCalendar(${JSON.stringify(res).replace(/'/g, "&#39;")})'>
+                  <i data-lucide="calendar" style="width: 13px; height: 13px;"></i> Add to Calendar
+                </button>
+                <button class="btn-pill-outline" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-color: #fca5a5; color: #b91c1c; gap: 4px;" onclick="cancelStudentReservation('${res.id}')">
+                  <i data-lucide="x" style="width: 13px; height: 13px;"></i> Cancel
+                </button>
+              </div>
             </div>
-            <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-              🕒 ${formatDateTime(res.start_time)} - ${formatDateTime(res.end_time)} &bull; Purpose: ${res.purpose}
-            </p>
-            ${res.accompanying_count > 0 ? `
-              <div class="attendees-summary">
-                👥 Group: 1 Requester + ${res.accompanying_count} Accompanying Students
-              </div>
-            ` : ''}
+            <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 3px;">
+              <div>🕒 ${formatTimeRangeCompact(res.start_time, res.end_time)} &bull; Purpose: ${res.purpose}</div>
+              ${attendees.length > 0 ? `
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                  <span>👥 Party: 1 requester + ${attendees.length} accompanying</span>
+                  <div style="display: inline-flex;">${circles}</div>
+                </div>
+              ` : ''}
+            </div>
           `;
           activeList.appendChild(card);
         });
       }
+      if (window.lucide) lucide.createIcons();
     }
 
     async function claimStandbyOffer(waitlistId) {
@@ -2418,7 +3084,7 @@
     async function verifyQRCheckIn(reservationId) {
       try {
         const res = await apiRequest(`/api/bookings/${reservationId}/scan-qr`, { method: 'POST' });
-        showToast(res.message || 'QR Check-In Verified! Room is officially Scanned.', 'success');
+        showToast(res.message || 'QR Check-In Verified! Room attendance confirmed.', 'success');
         loadStudentDashboard();
       } catch (err) {
         console.error('QR Check-In error:', err);
@@ -2426,12 +3092,13 @@
     }
 
     // =====================================================================
-    // STUDENT HISTORY TAB
+    // STUDENT HISTORY TAB WITH COUNTS & DATE GROUPINGS
     // =====================================================================
     function filterHistory(filterType) {
       AppState.historyFilter = filterType;
       document.querySelectorAll('#student-tab-history .nav-tab-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      const activeTabBtn = document.getElementById(`hist-tab-${filterType}`);
+      if (activeTabBtn) activeTabBtn.classList.add('active');
       if (AppState.dashboardData) {
         renderStudentHistory(AppState.dashboardData.history_by_status || AppState.dashboardData.history || {});
       }
@@ -2441,19 +3108,28 @@
       const container = document.getElementById('history-cards-container');
       container.innerHTML = '';
 
-      let items = [];
-      if (AppState.historyFilter === 'All') {
-        Object.keys(history).forEach(status => {
-          items = items.concat(history[status]);
-        });
-      } else {
-        items = history[AppState.historyFilter] || [];
-      }
+      let allItems = [];
+      const counts = { All: 0, Booked: 0, Scanned: 0, Pending_Permission: 0, Expired: 0, Denied: 0 };
+
+      Object.keys(history).forEach(status => {
+        const list = history[status] || [];
+        if (counts[status] !== undefined) counts[status] = list.length;
+        allItems = allItems.concat(list);
+      });
+      counts.All = allItems.length;
+
+      // Update Tab Counts
+      ['All', 'Booked', 'Scanned', 'Pending_Permission', 'Expired', 'Denied'].forEach(k => {
+        const badge = document.getElementById(`hist-count-${k}`);
+        if (badge) badge.textContent = counts[k] || 0;
+      });
+
+      let items = AppState.historyFilter === 'All' ? allItems : (history[AppState.historyFilter] || []);
 
       if (items.length === 0) {
         container.innerHTML = `
-          <div style="background: var(--surface); border: 1px dashed var(--border); border-radius: 16px; padding: 2.5rem; text-align: center; color: var(--text-secondary);">
-            No records found for status: <strong>${AppState.historyFilter}</strong>
+          <div style="background: #FFFFFF; border: 1px dashed var(--border); border-radius: 12px; padding: 2.5rem; text-align: center; color: var(--text-secondary);">
+            No records found for status: <strong>${AppState.historyFilter.replace('_', ' ')}</strong>
           </div>
         `;
         return;
@@ -2461,35 +3137,69 @@
 
       items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-      items.forEach(item => {
-        let tagClass = 'tag-neutral';
-        if (item.status === 'Scanned') tagClass = 'tag-emerald';
-        if (item.status === 'Booked') tagClass = 'tag-blue';
-        if (item.status === 'Pending_Permission') tagClass = 'tag-amber';
-        if (item.status === 'Expired' || item.status === 'Denied') tagClass = 'tag-rose';
+      // Date Grouping (Today, This week, Earlier)
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const weekStart = todayStart - 7 * 86400000;
 
-        const card = document.createElement('div');
-        card.className = 'history-card';
-        card.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-            <div>
-              <span class="pill-tag ${tagClass}">${item.status.replace('_', ' ')}</span>
-              ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
-              <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${item.space_name}</h4>
-            </div>
-            <span style="font-size: 0.82rem; color: var(--text-muted);">${formatDateTime(item.created_at)}</span>
-          </div>
-          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-            🕒 ${formatDateTime(item.start_time)} - ${formatDateTime(item.end_time)} &bull; Purpose: ${item.purpose}
-          </p>
-          ${item.accompanying_count > 0 ? `
-            <div class="attendees-summary">
-              👥 Group of ${item.accompanying_count + 1} students (1 requester + ${item.accompanying_count} verified attendees)
-            </div>
-          ` : ''}
-        `;
-        container.appendChild(card);
+      const groups = { 'Today': [], 'This Week': [], 'Earlier': [] };
+
+      items.forEach(item => {
+        const t = new Date(item.created_at).getTime();
+        if (t >= todayStart) {
+          groups['Today'].push(item);
+        } else if (t >= weekStart) {
+          groups['This Week'].push(item);
+        } else {
+          groups['Earlier'].push(item);
+        }
       });
+
+      Object.keys(groups).forEach(groupName => {
+        const groupItems = groups[groupName];
+        if (groupItems.length === 0) return;
+
+        const groupHeader = document.createElement('h4');
+        groupHeader.style.cssText = 'font-size: 0.88rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1.25rem 0 0.5rem;';
+        groupHeader.textContent = groupName;
+        container.appendChild(groupHeader);
+
+        groupItems.forEach(item => {
+          let tagClass = 'tag-neutral';
+          if (item.status === 'Scanned') tagClass = 'tag-emerald';
+          if (item.status === 'Booked') tagClass = 'tag-blue';
+          if (item.status === 'Pending_Permission') tagClass = 'tag-amber';
+          if (item.status === 'Expired' || item.status === 'Denied') tagClass = 'tag-rose';
+
+          const roomTitle = getRoomName(item);
+
+          const card = document.createElement('div');
+          card.className = 'history-card';
+          card.style.cssText = 'background: #FFFFFF; border: 1px solid var(--border); border-radius: 12px; padding: 0.85rem 1.25rem; margin-bottom: 0.65rem; min-height: 72px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;';
+
+          card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+              <span class="pill-tag ${tagClass}" style="min-width: 90px; justify-content: center;">
+                ${item.status.replace('_', ' ')}
+              </span>
+              ${item.is_urgent ? '<span class="pill-tag tag-rose" style="font-weight: 700;"><i data-lucide="flag" style="width: 12px; height: 12px;"></i> URGENT</span>' : ''}
+              <div>
+                <strong style="color: var(--text-primary); font-size: 0.95rem;">${roomTitle}</strong>
+                <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">
+                  🕒 ${formatTimeRangeCompact(item.start_time, item.end_time)} &bull; ${item.purpose || 'Booking'}
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.85rem;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">${(item.accompanying_count || 0) + 1} Pax</span>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">${formatDateTime(item.created_at)}</span>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      });
+
+      if (window.lucide) lucide.createIcons();
     }
 
     // =====================================================================
@@ -2532,7 +3242,17 @@
         document.getElementById('stat-pending-approvals').textContent = pendingList.length;
         document.getElementById('stat-scanned-count').textContent = historyData.by_status?.['Scanned'] || 0;
         document.getElementById('stat-expired-count').textContent = historyData.by_status?.['Expired'] || 0;
-        document.getElementById('admin-pending-count').textContent = pendingList.length;
+
+        // Hide Pending 0 badge if zero
+        const pendingBadge = document.getElementById('admin-pending-count');
+        if (pendingBadge) {
+          if (pendingList.length === 0) {
+            pendingBadge.style.display = 'none';
+          } else {
+            pendingBadge.style.display = 'inline-block';
+            pendingBadge.textContent = pendingList.length;
+          }
+        }
         document.getElementById('admin-pending-badge').textContent = `${pendingList.length} Pending`;
 
         renderAdminPendingRequests(pendingList);
@@ -2548,10 +3268,12 @@
 
       if (requests.length === 0) {
         container.innerHTML = `
-          <div style="background: var(--surface); border: 1px dashed var(--border); border-radius: 16px; padding: 2.5rem; text-align: center; color: var(--text-secondary);">
-            ✅ No pending facility requests. All applications have been reviewed.
+          <div style="background: #FFFFFF; border: 1.5px dashed var(--border); border-radius: 12px; padding: 2.5rem; text-align: center; color: var(--text-secondary);">
+            <i data-lucide="check-circle-2" style="width: 32px; height: 32px; color: #16a34a; margin-bottom: 0.5rem;"></i>
+            <p style="font-weight: 600;">No pending facility requests. All applications have been reviewed.</p>
           </div>
         `;
+        if (window.lucide) lucide.createIcons({ root: container });
         return;
       }
 
@@ -2560,48 +3282,51 @@
         card.className = 'pending-request-card';
         if (req.is_urgent) {
           card.style.border = '2px solid #ef4444';
-          card.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.18)';
+          card.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.12)';
         }
 
         const attendees = req.accompanying_students || [];
         const hasAttendees = attendees.length > 0;
+        const roomTitle = getRoomName(req);
 
         card.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
             <div>
-              ${req.is_urgent ? `
-                <span class="pill-tag tag-rose" style="background: #fee2e2; color: #991b1b; border: 1.5px solid #ef4444; font-weight: 700; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); margin-right: 6px;">
-                  🚨 URGENT
-                </span>
-              ` : ''}
-              <span class="pill-tag tag-amber">PENDING FACULTY APPROVAL</span>
-              <h3 style="font-size: 1.3rem; margin-top: 0.35rem; color: var(--text-primary);">${req.space_name}</h3>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                ${req.is_urgent ? `
+                  <span class="pill-tag tag-rose" style="font-weight: 700; box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);">
+                    <i data-lucide="flag" style="width: 12px; height: 12px;"></i> URGENT
+                  </span>
+                ` : ''}
+                <span class="pill-tag tag-amber">Pending Faculty Approval</span>
+              </div>
+              <h3 style="font-size: 1.3rem; margin-top: 0.35rem; color: var(--text-primary); font-weight: 700;">${roomTitle}</h3>
             </div>
             <div style="display: flex; gap: 0.65rem;">
-              <button class="btn-pill-dark" style="background: #15803D; font-size: 0.85rem; padding: 0.5rem 1.15rem;" onclick="adminApprove('${req.id}')">
-                ✓ Approve
+              <button class="btn-pill-dark" style="background: #15803D; font-size: 0.85rem; padding: 0.5rem 1.15rem; gap: 6px;" onclick="adminApprove('${req.id}')">
+                <i data-lucide="check" style="width: 15px; height: 15px;"></i> Approve
               </button>
-              <button class="btn-pill-outline" style="border-color: #B91C1C; color: #B91C1C; font-size: 0.85rem; padding: 0.5rem 1.15rem;" onclick="adminDeny('${req.id}')">
-                ✕ Deny
+              <button class="btn-pill-outline" style="border-color: #B91C1C; color: #B91C1C; font-size: 0.85rem; padding: 0.5rem 1.15rem; gap: 6px;" onclick="adminDeny('${req.id}')">
+                <i data-lucide="x" style="width: 15px; height: 15px;"></i> Deny
               </button>
             </div>
           </div>
 
-          <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 0.88rem;">
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-secondary);">
             <span><strong>Requester:</strong> ${req.user_name} (${req.user_email})</span>
             <span>&bull;</span>
-            <span><strong>Slot:</strong> ${formatDateTime(req.start_time)} - ${formatDateTime(req.end_time)}</span>
+            <span><strong>Slot:</strong> ${formatTimeRangeCompact(req.start_time, req.end_time)}</span>
             <span>&bull;</span>
             <span><strong>Party Size:</strong> ${req.accompanying_count + 1} Students</span>
           </div>
 
-          <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
-            🎯 <strong>Stated Purpose:</strong> ${req.purpose}
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
+            <strong>Stated Purpose:</strong> ${req.purpose}
           </p>
 
           ${hasAttendees ? `
             <div style="margin-top: 1rem;">
-              <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
                 Verified Accompanying Attendees (${attendees.length}):
               </span>
               <table class="attendees-table">
@@ -2633,6 +3358,7 @@
         `;
         container.appendChild(card);
       });
+      if (window.lucide) lucide.createIcons();
     }
 
     async function adminApprove(id) {
@@ -2655,7 +3381,7 @@
       }
     }
 
-    // Requirement 4 & 5: Cancel / Revoke active reservation after approval
+    // Cancel / Revoke active reservation after approval
     async function adminCancelReservation(reservationId) {
       if (!confirm('Are you sure you want to cancel and revoke this reservation? This will immediately free up the room for other students.')) {
         return;
@@ -2700,29 +3426,33 @@
 
               let checkinBadge = '<span class="pill-tag tag-neutral">&mdash;</span>';
               if (item.status === 'Scanned') {
-                checkinBadge = '<span class="pill-tag tag-emerald" style="font-weight: 600;">🟢 Checked In (Scanned)</span>';
+                checkinBadge = '<span class="pill-tag tag-emerald" style="font-weight: 600;"><i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> Checked In</span>';
               } else if (item.status === 'Booked') {
-                checkinBadge = '<span class="pill-tag tag-amber" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-weight: 600;">⏳ Pending Check-In</span>';
+                checkinBadge = '<span class="pill-tag tag-amber" style="font-weight: 600;"><i data-lucide="clock" style="width: 12px; height: 12px;"></i> Pending Check-In</span>';
               } else if (item.status === 'Expired') {
-                checkinBadge = '<span class="pill-tag tag-rose" style="font-size: 0.75rem;">❌ Expired (No Show)</span>';
+                checkinBadge = '<span class="pill-tag tag-rose" style="font-size: 0.75rem;"><i data-lucide="x" style="width: 12px; height: 12px;"></i> Expired (No-Show)</span>';
               }
+
+              const timeSlot = formatTimeRangeCompact(item.start_time, item.end_time);
+              const roomTitle = getRoomName(item);
+              const shortPurpose = item.purpose.length > 38 ? item.purpose.substring(0, 35) + '...' : item.purpose;
 
               return `
                 <tr>
                   <td>
                     <span class="pill-tag ${tag}">${item.status.replace('_', ' ')}</span>
-                    ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 4px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
+                    ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 4px; font-weight: 700;"><i data-lucide="flag" style="width: 12px; height: 12px;"></i> URGENT</span>' : ''}
                   </td>
-                  <td><strong>${item.room_name || item.space_name}</strong></td>
+                  <td><strong>${roomTitle}</strong></td>
                   <td>${item.student_name || item.user_name}<br><small style="color: var(--text-muted);">${item.student_email || item.user_email}</small></td>
-                  <td>${formatDateTime(item.start_time)}<br><small style="color: var(--text-muted);">${formatDateTime(item.end_time)}</small></td>
+                  <td><span style="font-size: 0.85rem; white-space: nowrap;">${timeSlot}</span></td>
                   <td>${(item.accompanying_count || 0) + 1} Pax</td>
                   <td>${checkinBadge}</td>
-                  <td>${item.purpose}</td>
+                  <td title="${item.purpose}">${shortPurpose}</td>
                   <td>
                     ${canCancel ? `
-                      <button class="btn-pill-outline" style="border-color: #dc2626; color: #dc2626; font-size: 0.78rem; padding: 0.35rem 0.85rem; border-radius: 9999px; cursor: pointer; white-space: nowrap;" onclick="adminCancelReservation('${resId}')">
-                        ✕ Cancel Reservation
+                      <button class="btn-pill-outline" style="border-color: #dc2626; color: #dc2626; font-size: 0.78rem; padding: 0.35rem 0.85rem; border-radius: 8px; cursor: pointer; white-space: nowrap;" onclick="adminCancelReservation('${resId}')">
+                        ✕ Cancel
                       </button>
                     ` : `
                       <span style="font-size: 0.78rem; color: var(--text-muted);">&mdash;</span>
@@ -2737,44 +3467,67 @@
 
       container.innerHTML = html;
       if (overviewTable) overviewTable.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
     }
 
     // =====================================================================
-    // ROOM QR MANAGEMENT & PRINTABLE DOOR PLAQUES
+    // ROOM QR MANAGEMENT & PRINTABLE DOOR PLAQUES (CARD GRID & BULK PRINT)
     // =====================================================================
+    let cachedAdminSpaces = [];
+
     async function loadAdminRoomQRs() {
       const tbody = document.getElementById('admin-room-qrs-tbody');
       if (!tbody) return;
       tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">Loading facilities...</td></tr>';
       try {
         const spaces = await apiRequest('/api/spaces');
+        cachedAdminSpaces = spaces;
+
         if (!spaces || spaces.length === 0) {
           tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem;">No facilities found.</td></tr>';
           return;
         }
+
         tbody.innerHTML = spaces.map(s => {
           let acousticTag = 'tag-neutral';
           if (s.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
           if (s.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
           if (s.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
 
+          const scanUrl = `${window.location.origin}/#scan?space_id=${encodeURIComponent(s.id)}`;
+          const thumbUrl = `https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(scanUrl)}`;
+
           return `
             <tr>
-              <td><strong style="color: var(--text-primary); font-size: 0.95rem;">${s.name}</strong></td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <img src="${thumbUrl}" alt="QR" style="width: 36px; height: 36px; border-radius: 4px; border: 1px solid var(--border);">
+                  <strong style="color: var(--text-primary); font-size: 0.95rem;">${s.name}</strong>
+                </div>
+              </td>
               <td>${s.capacity} Seats</td>
               <td><span class="pill-tag ${acousticTag}">${s.acoustic_profile}</span></td>
               <td>
                 <button class="btn-pill-dark" style="font-size: 0.8rem; padding: 0.4rem 1rem; display: inline-flex; align-items: center; gap: 6px;" onclick='openRoomQRModal(${JSON.stringify(s)})'>
-                  🖨️ Print / View QR Code
+                  <i data-lucide="printer" style="width: 14px; height: 14px;"></i> Print / View Plaque
                 </button>
               </td>
             </tr>
           `;
         }).join('');
+        if (window.lucide) lucide.createIcons();
       } catch (err) {
         console.error('Failed to load spaces for QR:', err);
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-rose); padding: 1.5rem;">Failed to load facilities.</td></tr>';
       }
+    }
+
+    function printAllPlaques() {
+      if (!cachedAdminSpaces || cachedAdminSpaces.length === 0) {
+        showToast('Please wait for facilities list to load.', 'info');
+        return;
+      }
+      window.print();
     }
 
     function openRoomQRModal(space) {
@@ -2783,12 +3536,11 @@
       document.getElementById('plaque-room-acoustic').textContent = `Acoustic: ${space.acoustic_profile}`;
 
       const scanUrl = `${window.location.origin}/#scan?space_id=${encodeURIComponent(space.id)}`;
-      document.getElementById('plaque-url-text').textContent = scanUrl;
-
       const qrImg = document.getElementById('plaque-qr-img');
       qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(scanUrl)}`;
 
       document.getElementById('room-qr-modal').classList.add('open');
+      if (window.lucide) lucide.createIcons();
     }
 
     function closeRoomQRModal() {
@@ -2798,125 +3550,145 @@
     // =====================================================================
     // ALL ROOMS LIVE STATUS RADAR (STUDENT & ADMIN)
     // =====================================================================
-    async function loadLiveRoomStatus(containerId, isStudentView = true) {
+    let currentLiveStatusFilter = 'all';
+
+    async function loadLiveRoomStatus(containerId, isStudentView = true, isSilent = false) {
       const container = document.getElementById(containerId);
       if (!container) return;
-      container.innerHTML = `
-        <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-          <div style="font-size: 1.8rem; margin-bottom: 0.5rem;">⏳</div>
-          Loading real-time campus room occupancy...
-        </div>
-      `;
+
+      if (!isSilent) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            <i data-lucide="loader" style="width: 24px; height: 24px; animation: spin 1s linear infinite; margin-bottom: 8px;"></i>
+            <div>Loading real-time campus room occupancy...</div>
+          </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+      }
 
       try {
         const rooms = await apiRequest('/api/rooms/live-status');
         const total = rooms.length;
         const occupied = rooms.filter(r => r.is_occupied).length;
         const available = total - occupied;
-        const nowFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        let filteredRooms = rooms;
+        if (currentLiveStatusFilter === 'available') {
+          filteredRooms = rooms.filter(r => !r.is_occupied);
+        } else if (currentLiveStatusFilter === 'in_use') {
+          filteredRooms = rooms.filter(r => r.is_occupied);
+        } else if (['Silent', 'Collaborative', 'Amplified'].includes(currentLiveStatusFilter)) {
+          filteredRooms = rooms.filter(r => r.acoustic_profile === currentLiveStatusFilter);
+        }
 
         let html = `
-          <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+          <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.35rem;">
-                <span class="pill-tag tag-emerald">● REAL-TIME RADAR</span>
-                <h2 style="font-size: 1.5rem; color: var(--text-primary); margin: 0;">Campus Facility Live Status</h2>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.25rem;">
+                <h2 style="font-size: 1.4rem; color: var(--text-primary); margin: 0; font-weight: 800;">Campus Facility Live Status</h2>
               </div>
-              <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">
-                Live room occupancy refreshed at ${nowFormatted}. See available rooms at a glance.
-              </p>
+              <!-- Slim Strip Header -->
+              <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-secondary); background: #FFFFFF; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.85rem; display: inline-flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <span>${total} campus rooms</span> &bull;
+                <span style="color: var(--accent-emerald); font-weight: 700;">${available} available</span> &bull;
+                <span style="color: var(--accent-rose); font-weight: 700;">${occupied} in use</span>
+                <span style="color: var(--text-muted); font-size: 0.78rem; margin-left: 6px;">(Auto-refreshes every 10s)</span>
+              </div>
             </div>
-            <button class="btn-pill-dark" onclick="loadLiveRoomStatus('${containerId}', ${isStudentView})" style="font-size: 0.82rem; padding: 0.45rem 1rem;">
-              🔄 Refresh Status
+            <button class="btn-pill-outline" onclick="loadLiveRoomStatus('${containerId}', ${isStudentView})" style="font-size: 0.82rem; padding: 0.45rem 1rem; gap: 6px;">
+              <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Refresh
             </button>
           </div>
 
-          <!-- Quick Metrics Counters -->
-          <div class="admin-stat-grid" style="margin-bottom: 1.75rem;">
-            <div class="stat-card">
-              <span>Total Campus Rooms</span>
-              <h3>${total}</h3>
-            </div>
-            <div class="stat-card">
-              <span>🟢 Available Now</span>
-              <h3 style="color: var(--accent-emerald);">${available}</h3>
-            </div>
-            <div class="stat-card">
-              <span>🔴 Currently Occupied</span>
-              <h3 style="color: var(--accent-rose);">${occupied}</h3>
-            </div>
+          <!-- Quick Filters -->
+          <div class="quick-chips-row" style="margin-bottom: 1.5rem;">
+            <button class="quick-chip ${currentLiveStatusFilter === 'all' ? 'active' : ''}" onclick="filterLiveRooms('all', '${containerId}', ${isStudentView})">All (${total})</button>
+            <button class="quick-chip ${currentLiveStatusFilter === 'available' ? 'active' : ''}" onclick="filterLiveRooms('available', '${containerId}', ${isStudentView})">Available (${available})</button>
+            <button class="quick-chip ${currentLiveStatusFilter === 'in_use' ? 'active' : ''}" onclick="filterLiveRooms('in_use', '${containerId}', ${isStudentView})">In use (${occupied})</button>
+            <button class="quick-chip ${currentLiveStatusFilter === 'Silent' ? 'active' : ''}" onclick="filterLiveRooms('Silent', '${containerId}', ${isStudentView})">Silent</button>
+            <button class="quick-chip ${currentLiveStatusFilter === 'Collaborative' ? 'active' : ''}" onclick="filterLiveRooms('Collaborative', '${containerId}', ${isStudentView})">Collaborative</button>
+            <button class="quick-chip ${currentLiveStatusFilter === 'Amplified' ? 'active' : ''}" onclick="filterLiveRooms('Amplified', '${containerId}', ${isStudentView})">Amplified</button>
           </div>
 
           <!-- Live Room Cards Grid -->
           <div class="rooms-grid">
-            ${rooms.map(room => {
+            ${filteredRooms.map(room => {
               const isOcc = room.is_occupied;
               let acousticTag = 'tag-neutral';
               if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
               if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
               if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
 
-              const cardBorder = isOcc ? '1.5px solid #ef4444' : '1.5px solid #10b981';
-              const statusBadge = isOcc
-                ? '<span class="pill-tag tag-rose" style="font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🔴 OCCUPIED / IN USE</span>'
-                : '<span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 FREE / AVAILABLE NOW</span>';
-
               const currentRes = room.current_reservation;
               const nextRes = room.next_reservation;
 
+              // Countdown for occupied room
+              let freeCountdown = '';
+              if (isOcc && currentRes && currentRes.end_time) {
+                const endT = new Date(currentRes.end_time).getTime();
+                const mins = Math.max(1, Math.round((endT - Date.now()) / 60000));
+                freeCountdown = `Free in ${mins} min`;
+              }
+
               return `
-                <div class="room-card" style="border: ${cardBorder}; display: flex; flex-direction: column; justify-content: space-between;">
+                <div class="room-card" style="background: #FFFFFF; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; flex-direction: column; justify-content: space-between;">
                   <div>
                     <div class="room-card-header">
-                      ${statusBadge}
-                      <span class="pill-badge" style="font-size: 0.75rem;">Cap: ${room.capacity}</span>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 9px; height: 9px; border-radius: 50%; background: ${isOcc ? '#dc2626' : '#16a34a'}; display: inline-block;"></span>
+                        <span class="pill-tag ${isOcc ? 'tag-rose' : 'tag-emerald'}" style="font-weight: 700;">
+                          ${isOcc ? 'In Use' : 'Available'}
+                        </span>
+                        <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
+                      </div>
+                      <span class="pill-badge" style="font-size: 0.75rem;">${room.capacity} seats</span>
                     </div>
-                    <h3 class="room-title" style="margin-top: 0.4rem; margin-bottom: 0.4rem;">${room.name}</h3>
-                    <div class="room-specs" style="margin-bottom: 0.85rem;">
-                      <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
-                      <span class="pill-tag tag-neutral">High-Speed Wi-Fi</span>
-                      <span class="pill-tag tag-neutral">Smart Screen</span>
+
+                    <h3 class="room-title" style="margin-top: 0.4rem; margin-bottom: 0.35rem; font-weight: 700;">${room.name}</h3>
+
+                    <!-- Amenities as small hover icons -->
+                    <div style="display: flex; gap: 6px; margin-bottom: 0.85rem;" title="Amenities: Wi-Fi, Smart Display, Audio Pod">
+                      <span class="pill-tag tag-neutral" style="padding: 2px 6px; font-size: 0.72rem;"><i data-lucide="wifi" style="width: 12px; height: 12px;"></i> Wi-Fi</span>
+                      <span class="pill-tag tag-neutral" style="padding: 2px 6px; font-size: 0.72rem;"><i data-lucide="tv" style="width: 12px; height: 12px;"></i> Screen</span>
+                      <span class="pill-tag tag-neutral" style="padding: 2px 6px; font-size: 0.72rem;"><i data-lucide="mic" style="width: 12px; height: 12px;"></i> Audio</span>
                     </div>
 
                     ${isOcc && currentRes ? `
-                      <div style="background: rgba(239, 68, 68, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
-                        <div style="color: #991b1b; font-weight: 700; margin-bottom: 0.2rem;">
-                          Occupant: ${currentRes.user_name}
-                          ${currentRes.is_urgent ? '<span class="pill-tag tag-rose" style="font-size: 0.7rem; margin-left: 4px;">🚨 URGENT</span>' : ''}
+                      <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 0.75rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                          <strong style="color: #991B1B;">Occupant: ${currentRes.user_name}</strong>
+                          <span style="font-weight: 700; color: #B91C1C;">${freeCountdown}</span>
                         </div>
-                        <div style="color: #7f1d1d; margin-bottom: 0.2rem;">
+                        <div style="color: #7F1D1D; font-size: 0.8rem;">
                           🎯 "${currentRes.purpose}"
-                        </div>
-                        <div style="color: #991b1b; font-size: 0.78rem;">
-                          🕒 Free at: <strong>${formatDateTime(currentRes.end_time)}</strong>
                         </div>
                       </div>
                     ` : `
-                      <div style="background: rgba(16, 185, 129, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
-                        <div style="color: #065f46; font-weight: 600; margin-bottom: 0.2rem;">
-                          ✨ Unoccupied and ready for instant booking.
+                      <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 0.75rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
+                        <div style="color: #166534; font-weight: 600;">
+                          Vacant &bull; Ready for instant allocation
                         </div>
-                        <div style="color: #047857; font-size: 0.78rem;">
-                          ${nextRes ? `Next booking: ${formatDateTime(nextRes.start_time)}` : 'No upcoming bookings today'}
+                        <div style="color: #15803D; font-size: 0.78rem; margin-top: 2px;">
+                          ${nextRes ? `Next booked: ${formatDateTime(nextRes.start_time)}` : 'No upcoming reservations today'}
                         </div>
                       </div>
                     `}
                   </div>
 
-                  <div class="room-card-footer" style="padding-top: 0.75rem;">
+                  <div class="room-card-footer" style="padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
                     ${isStudentView ? (
                       isOcc ? `
-                        <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick="switchStudentTab('search')">
-                          ⚡ Check Alternative Slots &rarr;
+                        <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem; justify-content: center; gap: 6px;" onclick="switchStudentTab('search')">
+                          <i data-lucide="search" style="width: 14px; height: 14px;"></i> Search Future Slots
                         </button>
                       ` : `
-                        <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='quickBookSpaceFromLive(${JSON.stringify(room)})'>
-                          ⚡ Quick Book This Space &rarr;
+                        <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.45rem; justify-content: center; gap: 6px;" onclick='quickBookSpaceFromLive(${JSON.stringify(room)})'>
+                          <i data-lucide="calendar-plus" style="width: 14px; height: 14px;"></i> Quick Book Now
                         </button>
                       `
                     ) : `
-                      <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='openRoomQRModal(${JSON.stringify(room)})'>
-                        🖨️ View / Print Room QR
+                      <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem; justify-content: center; gap: 6px;" onclick='openRoomQRModal(${JSON.stringify(room)})'>
+                        <i data-lucide="printer" style="width: 14px; height: 14px;"></i> Print Door Plaque
                       </button>
                     `}
                   </div>
@@ -2927,14 +3699,28 @@
         `;
 
         container.innerHTML = html;
+        if (window.lucide) lucide.createIcons();
+
+        // Setup 10s auto-refresh
+        if (!liveStatusAutoRefreshTimer) {
+          liveStatusAutoRefreshTimer = setInterval(() => {
+            const studentLive = document.getElementById('student-tab-live-status');
+            const adminLive = document.getElementById('admin-panel-live-status');
+            if (studentLive && studentLive.classList.contains('active')) {
+              loadLiveRoomStatus('student-live-status-container', true, true);
+            } else if (adminLive && adminLive.style.display !== 'none') {
+              loadLiveRoomStatus('admin-live-status-container', false, true);
+            }
+          }, 10000);
+        }
       } catch (err) {
         console.error('Failed to load live room status:', err);
-        container.innerHTML = `
-          <div style="background: var(--surface-card); padding: 2rem; border-radius: 12px; text-align: center; color: var(--accent-rose);">
-            Failed to load live status radar. Please try again.
-          </div>
-        `;
       }
+    }
+
+    function filterLiveRooms(filterType, containerId, isStudentView) {
+      currentLiveStatusFilter = filterType;
+      loadLiveRoomStatus(containerId, isStudentView, true);
     }
 
     function quickBookSpaceFromLive(room) {
@@ -2945,7 +3731,7 @@
         capacity: 1,
         acousticProfile: room.acoustic_profile
       };
-      openBookingModal(room);
+      openBookingModal(room, false);
     }
 
     async function handleScannedRoomCheckin(spaceId) {
@@ -2954,7 +3740,7 @@
         const activeRes = (dashboard.active_bookings || []).find(b => b.space_id === spaceId && b.status === 'Booked');
         if (activeRes) {
           await verifyQRCheckIn(activeRes.id);
-          showToast(`Physical Door QR Scanned! Check-in confirmed for ${activeRes.space_name}.`, 'success');
+          showToast(`Physical Door QR Scanned! Check-in confirmed for ${getRoomName(activeRes)}.`, 'success');
         } else {
           showToast(`Door QR scanned. No active reservation found for this space right now.`, 'info');
           switchStudentTab('live-status');
@@ -3011,7 +3797,11 @@
       } else {
         syncUIState();
       }
+      if (window.lucide) lucide.createIcons();
     });
+  </script>
+</body>
+</html>
   </script>
 </body>
 </html>
