@@ -920,6 +920,40 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.9); }
+    }
+
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+      #printable-door-plaque, #printable-door-plaque * {
+        visibility: visible !important;
+      }
+      #printable-door-plaque {
+        position: fixed !important;
+        left: 50% !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 80% !important;
+        max-width: 600px !important;
+        margin: 0 !important;
+        padding: 40px !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        display: block !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+        border: 4px solid #000000 !important;
+        box-shadow: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
     @media (max-width: 768px) {
       .app-header { padding: 0.75rem 1rem; }
       .admin-layout { grid-template-columns: 1fr; }
@@ -957,11 +991,13 @@
       <!-- Authenticated Student State -->
       <div id="header-student-nav" style="display: none; align-items: center; gap: 0.75rem;">
         <button class="nav-tab-btn active" id="tab-btn-search" onclick="switchStudentTab('search')">🔍 Search Rooms</button>
+        <button class="nav-tab-btn" id="tab-btn-live-status" onclick="switchStudentTab('live-status')">🔴 Live Room Status</button>
         <button class="nav-tab-btn" id="tab-btn-dashboard" onclick="switchStudentTab('dashboard')">📋 My Dashboard</button>
         <button class="nav-tab-btn" id="tab-btn-history" onclick="switchStudentTab('history')">📜 History</button>
         <div class="pill-badge" id="student-user-pill">
           <span id="student-header-name">Student</span>
           <span class="pill-tag tag-emerald" id="student-header-bookings">0 Bookings</span>
+          <span class="pill-tag tag-rose" id="student-header-urgencies" style="margin-left: 4px; font-size: 0.75rem;">3/3 Urgencies</span>
         </div>
         <button class="btn-pill-outline" style="padding: 0.45rem 1rem; font-size: 0.82rem;" onclick="signOut()">Sign Out</button>
       </div>
@@ -1113,6 +1149,11 @@
         <!-- History items dynamically rendered -->
       </div>
     </div>
+
+    <!-- TAB 4: Student Live Room Status Radar -->
+    <div id="student-tab-live-status" class="portal-tab-content">
+      <div id="student-live-status-container"></div>
+    </div>
   </main>
 
   <!-- =====================================================================
@@ -1133,6 +1174,12 @@
           <a class="admin-nav-item" id="admin-nav-pending" onclick="switchAdminPanel('pending')">
             <span>⏳ Pending Requests</span>
             <span class="admin-nav-badge" id="admin-pending-count">0</span>
+          </a>
+          <a class="admin-nav-item" id="admin-nav-live-status" onclick="switchAdminPanel('live-status')">
+            <span>🔴 Live Room Status</span>
+          </a>
+          <a class="admin-nav-item" id="admin-nav-room-qrs" onclick="switchAdminPanel('room-qrs')">
+            <span>🖨️ Room QR Management</span>
           </a>
           <a class="admin-nav-item" id="admin-nav-spaces" onclick="switchAdminPanel('spaces')">
             <span>🏛️ Master Reservation Log</span>
@@ -1211,6 +1258,41 @@
             <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);">
               Full authorization to approve, deny, or revoke all university seminar halls, lecture suites, and laboratory bookings.
             </p>
+          </div>
+        </div>
+
+        <!-- PANEL 5: Live Room Status Radar -->
+        <div id="admin-panel-live-status" style="display: none;">
+          <div id="admin-live-status-container"></div>
+        </div>
+
+        <!-- PANEL 6: Room QR Management & Printable Door Plaques -->
+        <div id="admin-panel-room-qrs" style="display: none;">
+          <div class="section-header-row" style="margin-bottom: 1.25rem;">
+            <div>
+              <h3 class="section-title">🖨️ Campus Room QR Codes &amp; Door Plaques</h3>
+              <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Official scannable QR codes for classroom &amp; pod doors. Formatted for high-resolution paper printouts to support physical student check-in.
+              </p>
+            </div>
+            <button class="btn-pill-dark" onclick="loadAdminRoomQRs()" style="font-size: 0.82rem; padding: 0.45rem 1rem;">
+              🔄 Refresh List
+            </button>
+          </div>
+          <div class="table-container" style="background: var(--surface-card); border-radius: var(--radius-card); border: 1px solid var(--border-subtle); overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Space / Facility</th>
+                  <th>Capacity</th>
+                  <th>Acoustic Profile</th>
+                  <th>Door Plaque QR Action</th>
+                </tr>
+              </thead>
+              <tbody id="admin-room-qrs-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1323,6 +1405,22 @@
           <input type="text" id="bm-purpose" class="input-field" placeholder="e.g. Capstone project discussion, ML study circle, Hackathon prep">
         </div>
 
+        <!-- Urgent Request Quota Toggle Section -->
+        <div style="margin-bottom: 1.25rem; padding: 0.9rem 1rem; border-radius: 12px; background: rgba(239, 68, 68, 0.05); border: 1.5px dashed #f87171;">
+          <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="bm-is-urgent" style="margin-top: 3px; transform: scale(1.2); accent-color: #ef4444;" onchange="updateUrgentNotice()">
+            <div>
+              <strong style="color: #dc2626; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                🚨 Urgent Request (Use Monthly Urgency Quota)
+              </strong>
+              <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 3px; margin-bottom: 0;">
+                Fast-tracks critical facility needs directly to the top of Faculty Approval Queue.
+                <span id="bm-urgency-quota-text" style="font-weight: 600; color: #dc2626;">(3 remaining this month)</span>
+              </p>
+            </div>
+          </label>
+        </div>
+
         <!-- Accompanying Students Section (Dynamically Rendered & Editable) -->
         <div style="margin-bottom: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
@@ -1349,6 +1447,60 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 3: ROOM QR CODE PLAQUE & HIGH-RESOLUTION PRINT
+       ===================================================================== -->
+  <div id="room-qr-modal" class="modal-overlay" onclick="handleModalOverlayClick(event, 'room-qr-modal')">
+    <div class="modal-card" style="max-width: 520px; text-align: center;">
+      <button class="modal-close-btn no-print" onclick="closeRoomQRModal()">&times;</button>
+
+      <!-- Printable Plaque Container -->
+      <div id="printable-door-plaque" style="background: #ffffff; border: 3px solid #0f172a; border-radius: 16px; padding: 2rem 1.5rem; margin-bottom: 1.5rem; color: #0f172a; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <div style="text-transform: uppercase; letter-spacing: 1.5px; font-size: 0.76rem; font-weight: 800; color: #475569; margin-bottom: 0.5rem;">
+          Official University Facility Plaque
+        </div>
+        <h2 id="plaque-room-name" style="font-size: 1.75rem; color: #0f172a; font-weight: 800; margin-bottom: 0.25rem;">
+          Lecture Hall 101
+        </h2>
+        <div style="display: flex; justify-content: center; gap: 0.65rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+          <span id="plaque-room-cap" style="background: #f1f5f9; color: #334155; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px;">
+            Cap: 50 seats
+          </span>
+          <span id="plaque-room-acoustic" style="background: #f1f5f9; color: #334155; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.75rem; border-radius: 9999px;">
+            Acoustic: Collaborative
+          </span>
+        </div>
+
+        <!-- High-Resolution QR Container -->
+        <div style="display: inline-block; padding: 16px; background: #ffffff; border: 2px solid #e2e8f0; border-radius: 16px; margin-bottom: 0.85rem;">
+          <img id="plaque-qr-img" src="" alt="Room QR Code" style="width: 230px; height: 230px; display: block; image-rendering: pixelated; margin: 0 auto;">
+        </div>
+
+        <div style="font-size: 0.76rem; color: #64748b; margin-bottom: 1rem; word-break: break-all;" id="plaque-url-text">
+          https://.../
+        </div>
+
+        <div style="border-top: 1px dashed #cbd5e1; padding-top: 1rem; text-align: left; font-size: 0.82rem; color: #334155; line-height: 1.5;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 0.35rem;">📱 Student Attendance Check-In Instructions:</strong>
+          <ol style="margin: 0; padding-left: 1.2rem;">
+            <li>Scan this door QR with your device camera or Campus Hub app.</li>
+            <li>Confirm physical check-in within 15 minutes of scheduled start.</li>
+            <li>Unverified rooms are auto-released to students on standby queue.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 0.75rem; justify-content: center;" class="no-print">
+        <button class="btn-pill-dark" onclick="window.print()" style="padding: 0.65rem 1.5rem; display: inline-flex; align-items: center; gap: 8px;">
+          🖨️ Print QR Sheet
+        </button>
+        <button class="btn-pill-outline" onclick="closeRoomQRModal()" style="padding: 0.65rem 1.25rem;">
+          Close
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1614,6 +1766,13 @@
         adminNav.style.display = 'none';
         document.getElementById('student-header-name').textContent = AppState.user.name || 'Student';
         document.getElementById('student-header-bookings').textContent = `${AppState.user.total_bookings || 0} Bookings`;
+        const urgenciesUsed = AppState.user.urgent_requests_used || 0;
+        const urgenciesRemaining = Math.max(0, 3 - urgenciesUsed);
+        const urgElem = document.getElementById('student-header-urgencies');
+        if (urgElem) {
+          urgElem.textContent = `${urgenciesRemaining}/3 Urgencies`;
+          urgElem.className = urgenciesRemaining === 0 ? 'pill-tag tag-neutral' : 'pill-tag tag-rose';
+        }
         showView('student');
       }
     }
@@ -1641,6 +1800,10 @@
         document.getElementById('student-tab-history').classList.add('active');
         document.getElementById('tab-btn-history')?.classList.add('active');
         loadStudentDashboard();
+      } else if (tabName === 'live-status') {
+        document.getElementById('student-tab-live-status').classList.add('active');
+        document.getElementById('tab-btn-live-status')?.classList.add('active');
+        loadLiveRoomStatus('student-live-status-container', true);
       }
     }
 
@@ -1880,8 +2043,40 @@
         addAttendeeCard();
       }
 
+      const urgentCheckbox = document.getElementById('bm-is-urgent');
+      const urgentText = document.getElementById('bm-urgency-quota-text');
+      const usedUrgent = (AppState.user && AppState.user.urgent_requests_used) || 0;
+      const remainingUrgent = Math.max(0, 3 - usedUrgent);
+
+      if (urgentCheckbox && urgentText) {
+        urgentCheckbox.checked = false;
+        if (remainingUrgent <= 0) {
+          urgentCheckbox.disabled = true;
+          urgentText.textContent = '(0 of 3 remaining - Monthly Quota Exhausted)';
+        } else {
+          urgentCheckbox.disabled = false;
+          urgentText.textContent = `(${remainingUrgent} of 3 remaining this month)`;
+        }
+      }
+      updateUrgentNotice();
+
       updatePartySizeDisplay();
       document.getElementById('booking-modal').classList.add('open');
+    }
+
+    function updateUrgentNotice() {
+      const urgentCheckbox = document.getElementById('bm-is-urgent');
+      const isUrgent = urgentCheckbox ? urgentCheckbox.checked : false;
+      const allocBadge = document.querySelector('#booking-modal span[style*="Instant Allocation"], #booking-modal span[style*="Urgent Priority"]');
+      if (allocBadge) {
+        if (isUrgent) {
+          allocBadge.innerHTML = '🚨 Urgent Priority &bull; Faculty Approval Fast-Track';
+          allocBadge.style.color = '#dc2626';
+        } else {
+          allocBadge.innerHTML = 'Instant Allocation &bull; Auto-Approved';
+          allocBadge.style.color = '#16a34a';
+        }
+      }
     }
 
     function addAttendeeCard(data = {}) {
@@ -2014,6 +2209,15 @@
         }
       });
 
+      // Check Urgent Toggle & Monthly Quota
+      const urgentCheckbox = document.getElementById('bm-is-urgent');
+      const isUrgent = urgentCheckbox ? urgentCheckbox.checked : false;
+      const usedUrgent = (AppState.user && AppState.user.urgent_requests_used) || 0;
+
+      if (isUrgent && usedUrgent >= 3) {
+        modalErrors.push("Monthly urgent request quota (3/3) exhausted.");
+      }
+
       // If validation fails, display clean friendly bulleted summary inside the modal
       if (modalErrors.length > 0) {
         errorAlert.innerHTML = `
@@ -2034,7 +2238,8 @@
         end_time: AppState.searchParams.endTime,
         purpose: purpose,
         accompanying_count: validAttendees.length,
-        accompanying_students: validAttendees
+        accompanying_students: validAttendees,
+        is_urgent: isUrgent
       };
 
       const submitBtn = document.getElementById('bm-submit-btn');
@@ -2048,7 +2253,13 @@
         });
 
         closeBookingModal();
-        showToast('Reservation confirmed! Instant allocation auto-approved.', 'success');
+        if (isUrgent) {
+          if (AppState.user) AppState.user.urgent_requests_used = (AppState.user.urgent_requests_used || 0) + 1;
+          syncUIState();
+          showToast('🚨 Urgent request submitted! Fast-tracked to the top of Faculty Review Queue.', 'info');
+        } else {
+          showToast('Reservation confirmed! Instant allocation auto-approved.', 'success');
+        }
         switchStudentTab('dashboard');
       } catch (err) {
         console.error('Booking submission error:', err);
@@ -2066,6 +2277,11 @@
       try {
         const data = await apiRequest('/api/user/dashboard');
         AppState.dashboardData = data;
+        if (data.user) {
+          AppState.user = data.user;
+          localStorage.setItem('user_data', JSON.stringify(data.user));
+          syncUIState();
+        }
         renderStudentDashboard(data);
         renderStudentHistory(data.history_by_status || data.history || {});
       } catch (err) {
@@ -2170,6 +2386,7 @@
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
               <div>
                 <span class="pill-tag ${statusTag}">${res.status.replace('_', ' ')}</span>
+                ${res.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
                 <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${res.space_name}</h4>
               </div>
               <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.created_at)}</span>
@@ -2257,6 +2474,7 @@
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
             <div>
               <span class="pill-tag ${tagClass}">${item.status.replace('_', ' ')}</span>
+              ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
               <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${item.space_name}</h4>
             </div>
             <span style="font-size: 0.82rem; color: var(--text-muted);">${formatDateTime(item.created_at)}</span>
@@ -2289,8 +2507,16 @@
       document.getElementById('admin-panel-pending').style.display = panelName === 'pending' ? 'block' : 'none';
       document.getElementById('admin-panel-spaces').style.display = panelName === 'spaces' ? 'block' : 'none';
       document.getElementById('admin-panel-profile').style.display = panelName === 'profile' ? 'block' : 'none';
+      document.getElementById('admin-panel-live-status').style.display = panelName === 'live-status' ? 'block' : 'none';
+      document.getElementById('admin-panel-room-qrs').style.display = panelName === 'room-qrs' ? 'block' : 'none';
 
-      loadAdminData();
+      if (panelName === 'live-status') {
+        loadLiveRoomStatus('admin-live-status-container', false);
+      } else if (panelName === 'room-qrs') {
+        loadAdminRoomQRs();
+      } else {
+        loadAdminData();
+      }
     }
 
     async function loadAdminData() {
@@ -2332,6 +2558,10 @@
       requests.forEach(req => {
         const card = document.createElement('div');
         card.className = 'pending-request-card';
+        if (req.is_urgent) {
+          card.style.border = '2px solid #ef4444';
+          card.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.18)';
+        }
 
         const attendees = req.accompanying_students || [];
         const hasAttendees = attendees.length > 0;
@@ -2339,6 +2569,11 @@
         card.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
             <div>
+              ${req.is_urgent ? `
+                <span class="pill-tag tag-rose" style="background: #fee2e2; color: #991b1b; border: 1.5px solid #ef4444; font-weight: 700; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); margin-right: 6px;">
+                  🚨 URGENT
+                </span>
+              ` : ''}
               <span class="pill-tag tag-amber">PENDING FACULTY APPROVAL</span>
               <h3 style="font-size: 1.3rem; margin-top: 0.35rem; color: var(--text-primary);">${req.space_name}</h3>
             </div>
@@ -2420,7 +2655,7 @@
       }
     }
 
-    // Requirement 5: Cancel / Revoke active reservation after approval
+    // Requirement 4 & 5: Cancel / Revoke active reservation after approval
     async function adminCancelReservation(reservationId) {
       if (!confirm('Are you sure you want to cancel and revoke this reservation? This will immediately free up the room for other students.')) {
         return;
@@ -2447,6 +2682,7 @@
               <th>Student</th>
               <th>Time Slot</th>
               <th>Party</th>
+              <th>Check-In Tracking</th>
               <th>Purpose</th>
               <th>Action</th>
             </tr>
@@ -2462,17 +2698,30 @@
               const resId = item.reservation_id || item.id;
               const canCancel = item.status === 'Booked' || item.status === 'Scanned';
 
+              let checkinBadge = '<span class="pill-tag tag-neutral">&mdash;</span>';
+              if (item.status === 'Scanned') {
+                checkinBadge = '<span class="pill-tag tag-emerald" style="font-weight: 600;">🟢 Checked In (Scanned)</span>';
+              } else if (item.status === 'Booked') {
+                checkinBadge = '<span class="pill-tag tag-amber" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-weight: 600;">⏳ Pending Check-In</span>';
+              } else if (item.status === 'Expired') {
+                checkinBadge = '<span class="pill-tag tag-rose" style="font-size: 0.75rem;">❌ Expired (No Show)</span>';
+              }
+
               return `
                 <tr>
-                  <td><span class="pill-tag ${tag}">${item.status.replace('_', ' ')}</span></td>
-                  <td><strong>${item.space_name}</strong></td>
+                  <td>
+                    <span class="pill-tag ${tag}">${item.status.replace('_', ' ')}</span>
+                    ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 4px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
+                  </td>
+                  <td><strong>${item.room_name || item.space_name}</strong></td>
                   <td>${item.student_name || item.user_name}<br><small style="color: var(--text-muted);">${item.student_email || item.user_email}</small></td>
                   <td>${formatDateTime(item.start_time)}<br><small style="color: var(--text-muted);">${formatDateTime(item.end_time)}</small></td>
                   <td>${(item.accompanying_count || 0) + 1} Pax</td>
+                  <td>${checkinBadge}</td>
                   <td>${item.purpose}</td>
                   <td>
                     ${canCancel ? `
-                      <button class="btn-pill-outline" style="border-color: #dc2626; color: #dc2626; font-size: 0.78rem; padding: 0.35rem 0.85rem; border-radius: 9999px; cursor: pointer;" onclick="adminCancelReservation('${resId}')">
+                      <button class="btn-pill-outline" style="border-color: #dc2626; color: #dc2626; font-size: 0.78rem; padding: 0.35rem 0.85rem; border-radius: 9999px; cursor: pointer; white-space: nowrap;" onclick="adminCancelReservation('${resId}')">
                         ✕ Cancel Reservation
                       </button>
                     ` : `
@@ -2491,6 +2740,231 @@
     }
 
     // =====================================================================
+    // ROOM QR MANAGEMENT & PRINTABLE DOOR PLAQUES
+    // =====================================================================
+    async function loadAdminRoomQRs() {
+      const tbody = document.getElementById('admin-room-qrs-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">Loading facilities...</td></tr>';
+      try {
+        const spaces = await apiRequest('/api/spaces');
+        if (!spaces || spaces.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem;">No facilities found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = spaces.map(s => {
+          let acousticTag = 'tag-neutral';
+          if (s.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
+          if (s.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
+          if (s.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
+
+          return `
+            <tr>
+              <td><strong style="color: var(--text-primary); font-size: 0.95rem;">${s.name}</strong></td>
+              <td>${s.capacity} Seats</td>
+              <td><span class="pill-tag ${acousticTag}">${s.acoustic_profile}</span></td>
+              <td>
+                <button class="btn-pill-dark" style="font-size: 0.8rem; padding: 0.4rem 1rem; display: inline-flex; align-items: center; gap: 6px;" onclick='openRoomQRModal(${JSON.stringify(s)})'>
+                  🖨️ Print / View QR Code
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load spaces for QR:', err);
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-rose); padding: 1.5rem;">Failed to load facilities.</td></tr>';
+      }
+    }
+
+    function openRoomQRModal(space) {
+      document.getElementById('plaque-room-name').textContent = space.name;
+      document.getElementById('plaque-room-cap').textContent = `Cap: ${space.capacity} seats`;
+      document.getElementById('plaque-room-acoustic').textContent = `Acoustic: ${space.acoustic_profile}`;
+
+      const scanUrl = `${window.location.origin}/#scan?space_id=${encodeURIComponent(space.id)}`;
+      document.getElementById('plaque-url-text').textContent = scanUrl;
+
+      const qrImg = document.getElementById('plaque-qr-img');
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(scanUrl)}`;
+
+      document.getElementById('room-qr-modal').classList.add('open');
+    }
+
+    function closeRoomQRModal() {
+      document.getElementById('room-qr-modal').classList.remove('open');
+    }
+
+    // =====================================================================
+    // ALL ROOMS LIVE STATUS RADAR (STUDENT & ADMIN)
+    // =====================================================================
+    async function loadLiveRoomStatus(containerId, isStudentView = true) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = `
+        <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+          <div style="font-size: 1.8rem; margin-bottom: 0.5rem;">⏳</div>
+          Loading real-time campus room occupancy...
+        </div>
+      `;
+
+      try {
+        const rooms = await apiRequest('/api/rooms/live-status');
+        const total = rooms.length;
+        const occupied = rooms.filter(r => r.is_occupied).length;
+        const available = total - occupied;
+        const nowFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        let html = `
+          <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.35rem;">
+                <span class="pill-tag tag-emerald">● REAL-TIME RADAR</span>
+                <h2 style="font-size: 1.5rem; color: var(--text-primary); margin: 0;">Campus Facility Live Status</h2>
+              </div>
+              <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">
+                Live room occupancy refreshed at ${nowFormatted}. See available rooms at a glance.
+              </p>
+            </div>
+            <button class="btn-pill-dark" onclick="loadLiveRoomStatus('${containerId}', ${isStudentView})" style="font-size: 0.82rem; padding: 0.45rem 1rem;">
+              🔄 Refresh Status
+            </button>
+          </div>
+
+          <!-- Quick Metrics Counters -->
+          <div class="admin-stat-grid" style="margin-bottom: 1.75rem;">
+            <div class="stat-card">
+              <span>Total Campus Rooms</span>
+              <h3>${total}</h3>
+            </div>
+            <div class="stat-card">
+              <span>🟢 Available Now</span>
+              <h3 style="color: var(--accent-emerald);">${available}</h3>
+            </div>
+            <div class="stat-card">
+              <span>🔴 Currently Occupied</span>
+              <h3 style="color: var(--accent-rose);">${occupied}</h3>
+            </div>
+          </div>
+
+          <!-- Live Room Cards Grid -->
+          <div class="rooms-grid">
+            ${rooms.map(room => {
+              const isOcc = room.is_occupied;
+              let acousticTag = 'tag-neutral';
+              if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
+              if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
+              if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
+
+              const cardBorder = isOcc ? '1.5px solid #ef4444' : '1.5px solid #10b981';
+              const statusBadge = isOcc
+                ? '<span class="pill-tag tag-rose" style="font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🔴 OCCUPIED / IN USE</span>'
+                : '<span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 FREE / AVAILABLE NOW</span>';
+
+              const currentRes = room.current_reservation;
+              const nextRes = room.next_reservation;
+
+              return `
+                <div class="room-card" style="border: ${cardBorder}; display: flex; flex-direction: column; justify-content: space-between;">
+                  <div>
+                    <div class="room-card-header">
+                      ${statusBadge}
+                      <span class="pill-badge" style="font-size: 0.75rem;">Cap: ${room.capacity}</span>
+                    </div>
+                    <h3 class="room-title" style="margin-top: 0.4rem; margin-bottom: 0.4rem;">${room.name}</h3>
+                    <div class="room-specs" style="margin-bottom: 0.85rem;">
+                      <span class="pill-tag ${acousticTag}">${room.acoustic_profile}</span>
+                      <span class="pill-tag tag-neutral">High-Speed Wi-Fi</span>
+                      <span class="pill-tag tag-neutral">Smart Screen</span>
+                    </div>
+
+                    ${isOcc && currentRes ? `
+                      <div style="background: rgba(239, 68, 68, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
+                        <div style="color: #991b1b; font-weight: 700; margin-bottom: 0.2rem;">
+                          Occupant: ${currentRes.user_name}
+                          ${currentRes.is_urgent ? '<span class="pill-tag tag-rose" style="font-size: 0.7rem; margin-left: 4px;">🚨 URGENT</span>' : ''}
+                        </div>
+                        <div style="color: #7f1d1d; margin-bottom: 0.2rem;">
+                          🎯 "${currentRes.purpose}"
+                        </div>
+                        <div style="color: #991b1b; font-size: 0.78rem;">
+                          🕒 Free at: <strong>${formatDateTime(currentRes.end_time)}</strong>
+                        </div>
+                      </div>
+                    ` : `
+                      <div style="background: rgba(16, 185, 129, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
+                        <div style="color: #065f46; font-weight: 600; margin-bottom: 0.2rem;">
+                          ✨ Unoccupied and ready for instant booking.
+                        </div>
+                        <div style="color: #047857; font-size: 0.78rem;">
+                          ${nextRes ? `Next booking: ${formatDateTime(nextRes.start_time)}` : 'No upcoming bookings today'}
+                        </div>
+                      </div>
+                    `}
+                  </div>
+
+                  <div class="room-card-footer" style="padding-top: 0.75rem;">
+                    ${isStudentView ? (
+                      isOcc ? `
+                        <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick="switchStudentTab('search')">
+                          ⚡ Check Alternative Slots &rarr;
+                        </button>
+                      ` : `
+                        <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='quickBookSpaceFromLive(${JSON.stringify(room)})'>
+                          ⚡ Quick Book This Space &rarr;
+                        </button>
+                      `
+                    ) : `
+                      <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='openRoomQRModal(${JSON.stringify(room)})'>
+                        🖨️ View / Print Room QR
+                      </button>
+                    `}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+
+        container.innerHTML = html;
+      } catch (err) {
+        console.error('Failed to load live room status:', err);
+        container.innerHTML = `
+          <div style="background: var(--surface-card); padding: 2rem; border-radius: 12px; text-align: center; color: var(--accent-rose);">
+            Failed to load live status radar. Please try again.
+          </div>
+        `;
+      }
+    }
+
+    function quickBookSpaceFromLive(room) {
+      initializeDateTimeInputs();
+      AppState.searchParams = {
+        startTime: document.getElementById('search-start').value,
+        endTime: document.getElementById('search-end').value,
+        capacity: 1,
+        acousticProfile: room.acoustic_profile
+      };
+      openBookingModal(room);
+    }
+
+    async function handleScannedRoomCheckin(spaceId) {
+      try {
+        const dashboard = await apiRequest('/api/user/dashboard');
+        const activeRes = (dashboard.active_bookings || []).find(b => b.space_id === spaceId && b.status === 'Booked');
+        if (activeRes) {
+          await verifyQRCheckIn(activeRes.id);
+          showToast(`Physical Door QR Scanned! Check-in confirmed for ${activeRes.space_name}.`, 'success');
+        } else {
+          showToast(`Door QR scanned. No active reservation found for this space right now.`, 'info');
+          switchStudentTab('live-status');
+        }
+      } catch (e) {
+        console.error('Scan QR check-in error:', e);
+      }
+    }
+
+    // =====================================================================
     // REQUIREMENT 7: PERSIST CURRENT SESSION & ACTIVE TAB ON REFRESH
     // =====================================================================
     document.addEventListener('DOMContentLoaded', () => {
@@ -2506,7 +2980,13 @@
           const hash = window.location.hash.replace('#', '');
           const activeView = localStorage.getItem('active_view') || '';
 
-          if (AppState.user.role === 'admin') {
+          if (hash.startsWith('scan')) {
+            const params = new URLSearchParams(hash.replace('scan?', ''));
+            const spaceId = params.get('space_id');
+            if (spaceId) {
+              handleScannedRoomCheckin(spaceId);
+            }
+          } else if (AppState.user.role === 'admin') {
             let panel = 'overview';
             if (hash.startsWith('admin-')) {
               panel = hash.replace('admin-', '');
@@ -2516,7 +2996,7 @@
             switchAdminPanel(panel);
           } else {
             let tab = 'search';
-            if (['search', 'dashboard', 'history'].includes(hash)) {
+            if (['search', 'dashboard', 'history', 'live-status'].includes(hash)) {
               tab = hash;
             } else if (activeView.startsWith('student-')) {
               tab = activeView.replace('student-', '');

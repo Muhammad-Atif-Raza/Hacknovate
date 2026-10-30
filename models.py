@@ -81,6 +81,7 @@ class User(Base):
         nullable=False,
     )
     total_bookings = Column(Integer, default=0, nullable=False)
+    urgent_requests_used = Column(Integer, default=0, nullable=False)
 
     reservations = relationship("Reservation", back_populates="user", cascade="all, delete-orphan")
     waitlists = relationship("StandbyWaitlist", back_populates="user", cascade="all, delete-orphan")
@@ -117,6 +118,7 @@ class Reservation(Base):
         default=ReservationStatus.PENDING_PERMISSION,
         nullable=False,
     )
+    is_urgent = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="reservations")

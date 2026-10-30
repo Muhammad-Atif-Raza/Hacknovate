@@ -22,6 +22,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: str
     total_bookings: int = 0
+    urgent_requests_used: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -77,6 +78,7 @@ class ReservationCreate(BaseModel):
     accompanying_count: int = Field(default=0, ge=0, le=99)
     accompanying_students: List[AccompanyingStudent] = Field(default_factory=list)
     purpose: str = Field(..., min_length=3, max_length=500)
+    is_urgent: bool = False
 
     @model_validator(mode="after")
     def validate_time_window(self) -> "ReservationCreate":
@@ -117,6 +119,7 @@ class ReservationResponse(BaseModel):
     start_time: datetime
     end_time: datetime
     status: ReservationStatus
+    is_urgent: bool = False
     created_at: datetime
     space: Optional[SpaceResponse] = None
     user: Optional[UserResponse] = None
@@ -230,6 +233,7 @@ class AdminHistoryItemResponse(BaseModel):
     start_time: datetime
     end_time: datetime
     status: ReservationStatus
+    is_urgent: bool = False
     created_at: datetime
 
 

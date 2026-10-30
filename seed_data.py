@@ -102,6 +102,7 @@ def seed_database(db: Session, force_reset: bool = False):
         photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=agrimgoel14@gmail.com",
         role=UserRole.STUDENT,
         total_bookings=4,
+        urgent_requests_used=1,
     )
 
     student_alex = User(
@@ -169,6 +170,7 @@ def seed_database(db: Session, force_reset: bool = False):
         start_time=datetime.combine(res_date, datetime.min.time()).replace(hour=10, minute=0),
         end_time=datetime.combine(res_date, datetime.min.time()).replace(hour=12, minute=0),
         status=ReservationStatus.PENDING_PERMISSION,
+        is_urgent=True,
         created_at=now - timedelta(hours=1),
     )
 

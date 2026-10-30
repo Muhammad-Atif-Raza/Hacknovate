@@ -9,6 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 
 from database import engine, Base, get_db, SessionLocal
@@ -67,6 +68,22 @@ async def lifespan(app: FastAPI):
     # Startup: Create tables and auto-seed if empty
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
+
+    # Safe column migration for SQLite
+    try:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE users ADD COLUMN urgent_requests_used INTEGER DEFAULT 0"))
+                conn.commit()
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE reservations ADD COLUMN is_urgent BOOLEAN DEFAULT 0"))
+                conn.commit()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"Column migration check note: {e}")
 
     db = SessionLocal()
     try:
@@ -141,6 +158,81 @@ def list_spaces(db: Session = Depends(get_db)):
     """Lists all available spaces / rooms on campus."""
     spaces = db.query(Space).order_by(Space.name.asc()).all()
     return spaces
+
+
+@app.get("/api/rooms/live-status", tags=["Spaces"])
+def get_rooms_live_status(db: Session = Depends(get_db)):
+    """
+    Returns real-time occupancy status for all campus spaces.
+    Identifies whether each space is currently 'Vacant / Free' or 'Occupied / In-Use',
+    along with occupant and upcoming scheduled booking.
+    """
+    now_utc = datetime.utcnow()
+    spaces = db.query(Space).order_by(Space.name.asc()).all()
+
+    active_statuses = [ReservationStatus.BOOKED, ReservationStatus.SCANNED]
+
+    result = []
+    for s in spaces:
+        current_res = (
+            db.query(Reservation)
+            .options(joinedload(Reservation.user))
+            .filter(
+                Reservation.space_id == s.id,
+                Reservation.status.in_(active_statuses),
+                Reservation.start_time <= now_utc,
+                Reservation.end_time > now_utc,
+            )
+            .first()
+        )
+
+        next_res = (
+            db.query(Reservation)
+            .options(joinedload(Reservation.user))
+            .filter(
+                Reservation.space_id == s.id,
+                Reservation.status.in_(active_statuses),
+                Reservation.start_time > now_utc,
+            )
+            .order_by(Reservation.start_time.asc())
+            .first()
+        )
+
+        curr_data = None
+        if current_res:
+            curr_data = {
+                "id": str(current_res.id),
+                "user_name": current_res.user.name if current_res.user else "Student",
+                "purpose": current_res.purpose,
+                "start_time": current_res.start_time.isoformat(),
+                "end_time": current_res.end_time.isoformat(),
+                "status": current_res.status.value,
+                "is_urgent": getattr(current_res, "is_urgent", False),
+            }
+
+        next_data = None
+        if next_res:
+            next_data = {
+                "id": str(next_res.id),
+                "user_name": next_res.user.name if next_res.user else "Student",
+                "purpose": next_res.purpose,
+                "start_time": next_res.start_time.isoformat(),
+                "end_time": next_res.end_time.isoformat(),
+                "status": next_res.status.value,
+                "is_urgent": getattr(next_res, "is_urgent", False),
+            }
+
+        result.append({
+            "id": str(s.id),
+            "name": s.name,
+            "capacity": s.capacity,
+            "acoustic_profile": s.acoustic_profile.value,
+            "is_occupied": current_res is not None,
+            "current_reservation": curr_data,
+            "next_reservation": next_data,
+        })
+
+    return result
 
 
 @app.post("/api/dev/seed", tags=["Developer Tools"])
@@ -393,6 +485,19 @@ def create_booking(
             detail="This space is already reserved for the selected timeframe. You can join the standby waitlist!",
         )
 
+    if payload.is_urgent:
+        if current_user.urgent_requests_used >= 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Monthly urgent request quota (3/3) exhausted.",
+            )
+        current_user.urgent_requests_used += 1
+        # Urgent requests jump to the top of Admin Pending Requests queue for fast-tracking
+        booking_status = ReservationStatus.PENDING_PERMISSION
+    else:
+        booking_status = ReservationStatus.BOOKED
+        current_user.total_bookings += 1
+
     reservation = Reservation(
         id=uuid.uuid4(),
         user_id=current_user.id,
@@ -402,11 +507,11 @@ def create_booking(
         accompanying_students=students_list,
         start_time=start_utc,
         end_time=end_utc,
-        status=ReservationStatus.BOOKED,
+        status=booking_status,
+        is_urgent=payload.is_urgent,
         created_at=datetime.utcnow(),
     )
     db.add(reservation)
-    current_user.total_bookings += 1
     db.commit()
     db.refresh(reservation)
 
@@ -674,6 +779,7 @@ def get_allotted_history(
                 start_time=r.start_time,
                 end_time=r.end_time,
                 status=r.status,
+                is_urgent=r.is_urgent,
                 created_at=r.created_at,
             )
         )
@@ -688,13 +794,13 @@ def get_pending_requests(
     """
     (For Admin Pending Request Page)
     Returns all reservations currently in 'Pending_Permission' status,
-    ordered by start_time ascending, joined with User and Space details.
+    ordered with urgent requests first, then start_time ascending.
     """
     pending = (
         db.query(Reservation)
         .options(joinedload(Reservation.user), joinedload(Reservation.space))
         .filter(Reservation.status == ReservationStatus.PENDING_PERMISSION)
-        .order_by(Reservation.start_time.asc())
+        .order_by(Reservation.is_urgent.desc(), Reservation.start_time.asc())
         .all()
     )
     return [ReservationResponse.model_validate(r) for r in pending]
@@ -774,6 +880,12 @@ def admin_make_decision(
             student = db.query(User).filter(User.id == reservation.user_id).first()
             if student and student.total_bookings > 0:
                 student.total_bookings -= 1
+
+        # If cancelling/denying an urgent request, refund student's monthly urgency quota
+        if reservation.is_urgent:
+            student = db.query(User).filter(User.id == reservation.user_id).first()
+            if student and student.urgent_requests_used > 0:
+                student.urgent_requests_used -= 1
 
         reservation.status = ReservationStatus.DENIED
 
