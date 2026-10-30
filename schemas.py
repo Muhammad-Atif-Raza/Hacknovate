@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional, List, Dict
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from models import UserRole, AcousticProfile, ReservationStatus
@@ -46,6 +46,18 @@ class SpaceResponse(SpaceBase):
 
 
 # ==========================================
+# Accompanying Student Schema
+# ==========================================
+class AccompanyingStudent(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, description="Full Name")
+    email: str = Field(..., min_length=3, max_length=255, description="College / Personal Email")
+    enrollment_number: str = Field(..., min_length=2, max_length=50, description="Enrollment / Roll Number")
+    phone_number: str = Field(..., min_length=10, max_length=15, description="10-digit Phone Number")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
 # Reservation Schemas
 # ==========================================
 class ReservationCreate(BaseModel):
@@ -53,12 +65,30 @@ class ReservationCreate(BaseModel):
     start_time: datetime
     end_time: datetime
     accompanying_count: int = Field(default=0, ge=0)
+    accompanying_students: List[AccompanyingStudent] = Field(default_factory=list)
     purpose: str = Field(..., min_length=3, max_length=500)
 
     @model_validator(mode="after")
     def validate_time_window(self) -> "ReservationCreate":
-        if self.end_time <= self.start_time:
-            raise ValueError("end_time must be strictly after start_time")
+        # Check start_time not in the past (allow 2-minute buffer for clock drift)
+        now_utc = datetime.utcnow()
+        st = self.start_time
+        if st.tzinfo is not None:
+            st = st.astimezone(timezone.utc).replace(tzinfo=None)
+        et = self.end_time
+        if et.tzinfo is not None:
+            et = et.astimezone(timezone.utc).replace(tzinfo=None)
+
+        if st < now_utc - timedelta(minutes=2):
+            raise ValueError("Start time cannot be in the past. Please select a future date and time.")
+
+        if et <= st:
+            raise ValueError("End time must be after start time.")
+
+        # Ensure accompanying_count is kept in sync if students list provided
+        if self.accompanying_students and len(self.accompanying_students) > 0:
+            self.accompanying_count = len(self.accompanying_students)
+
         return self
 
 
@@ -68,6 +98,7 @@ class ReservationResponse(BaseModel):
     space_id: uuid.UUID
     purpose: str
     accompanying_count: int
+    accompanying_students: List[AccompanyingStudent] = Field(default_factory=list)
     start_time: datetime
     end_time: datetime
     status: ReservationStatus
@@ -88,7 +119,18 @@ class StandbyJoinRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_standby_window(self) -> "StandbyJoinRequest":
-        if self.requested_end <= self.requested_start:
+        now_utc = datetime.utcnow()
+        st = self.requested_start
+        if st.tzinfo is not None:
+            st = st.astimezone(timezone.utc).replace(tzinfo=None)
+        et = self.requested_end
+        if et.tzinfo is not None:
+            et = et.astimezone(timezone.utc).replace(tzinfo=None)
+
+        if st < now_utc - timedelta(minutes=2):
+            raise ValueError("Requested start time cannot be in the past.")
+
+        if et <= st:
             raise ValueError("requested_end must be strictly after requested_start")
         return self
 
@@ -168,6 +210,7 @@ class AdminHistoryItemResponse(BaseModel):
     acoustic_profile: AcousticProfile
     purpose: str
     accompanying_count: int
+    accompanying_students: List[AccompanyingStudent] = Field(default_factory=list)
     start_time: datetime
     end_time: datetime
     status: ReservationStatus

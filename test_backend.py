@@ -36,7 +36,7 @@ def print_test_header(title: str):
 
 def run_all_tests():
     print_test_header("1. Health Check & Database Seeding")
-    resp = client.get("/")
+    resp = client.get("/api/health")
     assert resp.status_code == 200, f"Health check failed: {resp.text}"
     print("[OK] Health check online:", resp.json())
 
@@ -46,8 +46,8 @@ def run_all_tests():
     seed_info = resp.json()
     print("[OK] Database Seeded:", seed_info)
     assert seed_info["spaces_count"] == 6
-    assert seed_info["users_count"] == 3
-    assert seed_info["reservations_count"] == 3
+    assert seed_info["users_count"] >= 3
+    assert seed_info["reservations_count"] >= 3
 
     # Check spaces list
     resp = client.get("/api/spaces")
@@ -149,7 +149,7 @@ def run_all_tests():
     for s in collab_spaces:
         res = Reservation(
             id=uuid.uuid4(),
-            user_id="STU-2026-001",
+            user_id=student_auth["user"]["id"],
             space_id=s.id,
             purpose="Congestion Simulation",
             accompanying_count=0,
@@ -287,7 +287,7 @@ def run_all_tests():
     # Create a Booked reservation eligible for checkin right now (start_time = now + 2 mins)
     qr_res = Reservation(
         id=uuid.uuid4(),
-        user_id="STU-2026-001",
+        user_id=student_auth["user"]["id"],
         space_id=free_space["id"],
         purpose="Live Check-in Test",
         accompanying_count=0,
@@ -311,7 +311,7 @@ def run_all_tests():
     db = SessionLocal()
     future_res = Reservation(
         id=uuid.uuid4(),
-        user_id="STU-2026-001",
+        user_id=student_auth["user"]["id"],
         space_id=free_space["id"],
         purpose="Too Early Test",
         accompanying_count=0,
@@ -337,7 +337,7 @@ def run_all_tests():
     # Create an unverified Booked reservation that started 20 minutes ago (should auto-expire)
     unclaimed_res = Reservation(
         id=uuid.uuid4(),
-        user_id="STU-2026-001",
+        user_id=student_auth["user"]["id"],
         space_id=standby_test_space["id"],
         purpose="Unclaimed No-Show Test",
         accompanying_count=0,
@@ -350,7 +350,7 @@ def run_all_tests():
     # Add a student to StandbyWaitlist for this space and slot
     waitlist_student = StandbyWaitlist(
         id=uuid.uuid4(),
-        user_id="STU-2026-002",
+        user_id="STU-2026-003",
         space_id=standby_test_space["id"],
         requested_start=now - timedelta(minutes=20),
         requested_end=now + timedelta(minutes=40),

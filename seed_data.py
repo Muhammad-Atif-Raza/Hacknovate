@@ -126,9 +126,36 @@ def seed_database(db: Session, force_reset: bool = False):
     db.flush()
 
     # -------------------------------------------------------------
-    # 3. Sample Reservations (Pending & Booked)
+    # 3. Sample Reservations (Pending & Booked with Accompanying Students)
     # -------------------------------------------------------------
     now = datetime.utcnow()
+
+    res1_accompanying = [
+        {
+            "name": "Rohan Verma",
+            "email": "rohan.verma@st.niituniversity.in",
+            "enrollment_number": "BT26GCS015",
+            "phone_number": "9876543210",
+        },
+        {
+            "name": "Ananya Sen",
+            "email": "ananya.sen@st.niituniversity.in",
+            "enrollment_number": "BT26GCS042",
+            "phone_number": "9811223344",
+        },
+        {
+            "name": "Kavya Patel",
+            "email": "kavya.patel@st.niituniversity.in",
+            "enrollment_number": "BT26GCS088",
+            "phone_number": "9722334455",
+        },
+        {
+            "name": "Dev Sharma",
+            "email": "dev.sharma@st.niituniversity.in",
+            "enrollment_number": "BT26GCS104",
+            "phone_number": "9933445566",
+        },
+    ]
 
     # Booking 1: Pending_Permission for Agrim Goel in Central Innovation Lab
     res1 = Reservation(
@@ -136,12 +163,34 @@ def seed_database(db: Session, force_reset: bool = False):
         user_id=user_agrim.id,
         space_id=spaces_map["Central Innovation Lab"].id,
         purpose="AI Hackathon Platform Group Brainstorming",
-        accompanying_count=4,
+        accompanying_count=len(res1_accompanying),
+        accompanying_students=res1_accompanying,
         start_time=now + timedelta(hours=2),
         end_time=now + timedelta(hours=4),
         status=ReservationStatus.PENDING_PERMISSION,
         created_at=now - timedelta(hours=1),
     )
+
+    res2_accompanying = [
+        {
+            "name": "Tanmay Joshi",
+            "email": "tanmay.joshi@st.niituniversity.in",
+            "enrollment_number": "BT26GCS112",
+            "phone_number": "9844556677",
+        },
+        {
+            "name": "Meera Nair",
+            "email": "meera.nair@st.niituniversity.in",
+            "enrollment_number": "BT26GCS129",
+            "phone_number": "9855667788",
+        },
+        {
+            "name": "Aryan Rao",
+            "email": "aryan.rao@st.niituniversity.in",
+            "enrollment_number": "BT26GCS135",
+            "phone_number": "9866778899",
+        },
+    ]
 
     # Booking 2: Pending_Permission for Priya Sharma in Student Collaborative Lounge
     res2 = Reservation(
@@ -149,7 +198,8 @@ def seed_database(db: Session, force_reset: bool = False):
         user_id=student_priya.id,
         space_id=spaces_map["Student Collaborative Lounge"].id,
         purpose="Robotics & Embedded Systems Design Sprint",
-        accompanying_count=5,
+        accompanying_count=len(res2_accompanying),
+        accompanying_students=res2_accompanying,
         start_time=now + timedelta(days=1, hours=3),
         end_time=now + timedelta(days=1, hours=5),
         status=ReservationStatus.PENDING_PERMISSION,
@@ -163,6 +213,7 @@ def seed_database(db: Session, force_reset: bool = False):
         space_id=spaces_map["Library Silent Study Pod"].id,
         purpose="Deep Learning Research & Project Preparation",
         accompanying_count=0,
+        accompanying_students=[],
         start_time=now + timedelta(hours=1),
         end_time=now + timedelta(hours=2, minutes=30),
         status=ReservationStatus.BOOKED,

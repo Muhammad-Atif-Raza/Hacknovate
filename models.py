@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SAEnum,
     Index,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import TypeDecorator, CHAR
@@ -108,6 +109,7 @@ class Reservation(Base):
     space_id = Column(GUID(), ForeignKey("spaces.id", ondelete="CASCADE"), nullable=False)
     purpose = Column(String, nullable=False)
     accompanying_count = Column(Integer, default=0, nullable=False)
+    accompanying_students = Column(JSON, default=list, nullable=True)
     start_time = Column(DateTime, index=True, nullable=False)
     end_time = Column(DateTime, index=True, nullable=False)
     status = Column(

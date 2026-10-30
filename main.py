@@ -241,10 +241,17 @@ def search_rooms(
     start_utc = to_naive_utc(start_time)
     end_utc = to_naive_utc(end_time)
 
+    now_utc = datetime.utcnow()
+    if start_utc < now_utc - timedelta(minutes=2):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start time cannot be in the past. Please select a future date and time.",
+        )
+
     if end_utc <= start_utc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="end_time must be strictly after start_time",
+            detail="End time must be after start time.",
         )
 
     # Statuses that lock a room
@@ -319,6 +326,19 @@ def create_booking(
     start_utc = to_naive_utc(payload.start_time)
     end_utc = to_naive_utc(payload.end_time)
 
+    now_utc = datetime.utcnow()
+    if start_utc < now_utc - timedelta(minutes=2):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start time cannot be in the past. Please select a future date and time.",
+        )
+
+    if end_utc <= start_utc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="End time must be after start time.",
+        )
+
     # Verify space exists
     space = db.query(Space).filter(Space.id == payload.space_id).first()
     if not space:
@@ -327,8 +347,11 @@ def create_booking(
             detail="The requested space does not exist",
         )
 
+    students_list = [s.model_dump() for s in payload.accompanying_students] if payload.accompanying_students else []
+    accompanying_count = len(students_list) if students_list else payload.accompanying_count
+
     # Check capacity against party size (student + accompanying)
-    total_party_size = 1 + payload.accompanying_count
+    total_party_size = 1 + accompanying_count
     if space.capacity < total_party_size:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -363,7 +386,8 @@ def create_booking(
         user_id=current_user.id,
         space_id=payload.space_id,
         purpose=payload.purpose,
-        accompanying_count=payload.accompanying_count,
+        accompanying_count=accompanying_count,
+        accompanying_students=students_list,
         start_time=start_utc,
         end_time=end_utc,
         status=ReservationStatus.PENDING_PERMISSION,
@@ -632,6 +656,7 @@ def get_allotted_history(
                 acoustic_profile=r.space.acoustic_profile if r.space else AcousticProfile.COLLABORATIVE,
                 purpose=r.purpose,
                 accompanying_count=r.accompanying_count,
+                accompanying_students=r.accompanying_students or [],
                 start_time=r.start_time,
                 end_time=r.end_time,
                 status=r.status,
@@ -760,4 +785,61 @@ def get_admin_profile(
         role=admin.role,
         personal_bookings=admin.total_bookings,
         total_requests_processed=processed_count,
+    )
+
+
+# =====================================================================
+# Admin Convenience Aliases
+# =====================================================================
+@app.get("/api/admin/pending", response_model=List[ReservationResponse], tags=["Admin Portal"])
+def get_pending_requests_alias(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return get_pending_requests(admin=admin, db=db)
+
+
+@app.get("/api/admin/history", tags=["Admin Portal"])
+def get_admin_history_alias(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    items = get_allotted_history(admin=admin, db=db)
+    return {
+        "total_reservations": len(items),
+        "items": [item.model_dump() if hasattr(item, "model_dump") else item for item in items],
+        "by_status": {
+            "Booked": sum(1 for i in items if i.status == ReservationStatus.BOOKED),
+            "Scanned": sum(1 for i in items if i.status == ReservationStatus.SCANNED),
+            "Expired": sum(1 for i in items if i.status == ReservationStatus.EXPIRED),
+            "Denied": sum(1 for i in items if i.status == ReservationStatus.DENIED),
+        },
+    }
+
+
+@app.post("/api/admin/approve/{reservation_id}", response_model=ReservationResponse, tags=["Admin Portal"])
+def admin_approve_request(
+    reservation_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return admin_make_decision(
+        reservation_id=reservation_id,
+        payload=AdminDecisionRequest(action="approve"),
+        admin=admin,
+        db=db,
+    )
+
+
+@app.post("/api/admin/deny/{reservation_id}", response_model=ReservationResponse, tags=["Admin Portal"])
+def admin_deny_request(
+    reservation_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return admin_make_decision(
+        reservation_id=reservation_id,
+        payload=AdminDecisionRequest(action="deny"),
+        admin=admin,
+        db=db,
     )
