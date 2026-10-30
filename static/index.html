@@ -1263,8 +1263,13 @@
 
         <!-- PANEL 3: Master Reservation Log with Cancellation Action -->
         <div id="admin-panel-spaces" style="display: none;">
-          <div class="section-header-row">
-            <h3 class="section-title">🏛️ Master Reservation Log & Access Control</h3>
+          <div class="section-header-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <h3 class="section-title">🏛️ Master Reservation Log & Access Control</h3>
+            </div>
+            <button class="btn-pill-dark" style="background: #dc2626; font-size: 0.85rem; padding: 0.5rem 1rem;" onclick="adminCancelAllReservations()">
+              🗑️ Cancel All Reservations
+            </button>
           </div>
           <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
             Faculty administrators can inspect all reservations and revoke or cancel any approved/active allocation to immediately release spaces back to students.
@@ -1502,7 +1507,7 @@
 
         <!-- High-Resolution QR Container -->
         <div style="display: inline-block; padding: 16px; background: #ffffff; border: 2px solid #e2e8f0; border-radius: 16px; margin-bottom: 0.85rem;">
-          <img id="plaque-qr-img" src="" alt="Room QR Code" style="width: 230px; height: 230px; display: block; image-rendering: pixelated; margin: 0 auto;">
+          <img id="plaque-qr-img" src="" alt="Room QR Code" style="width: 190px; height: 190px; display: block; image-rendering: pixelated; margin: 0 auto;">
         </div>
 
         <div style="font-size: 0.76rem; color: #64748b; margin-bottom: 1rem; word-break: break-all;" id="plaque-url-text">
@@ -1548,11 +1553,8 @@
       <div id="camera-scanner-notice" style="font-size: 0.82rem; margin-bottom: 1rem;"></div>
 
       <div style="display: flex; flex-direction: column; gap: 0.65rem;">
-        <button class="btn-pill-dark" onclick="verifyQRCheckInDirectlyFallback()" style="width: 100%; font-size: 0.85rem;">
-          💻 Verify Check-In Directly (Webcam Fallback)
-        </button>
-        <button class="btn-pill-outline" onclick="closeCameraScanner()" style="width: 100%; font-size: 0.85rem;">
-          Cancel / Close
+        <button class="btn-pill-outline" onclick="closeCameraScanner()" style="width: 100%; font-size: 0.88rem; padding: 0.65rem;">
+          ✕ Close Scanner
         </button>
       </div>
     </div>
@@ -1571,9 +1573,6 @@
         This space currently has an active reservation. Choose an action below:
       </p>
       <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-        <button class="btn-pill-outline" style="width: 100%; font-size: 0.88rem; padding: 0.65rem;" onclick="document.getElementById('occupied-room-modal').classList.remove('open'); joinStandbyWaitlist(AppState.selectedSpace.id);">
-          ⏳ Join 3-Minute Standby Waitlist
-        </button>
         <button class="btn-pill-dark" style="width: 100%; font-size: 0.88rem; padding: 0.65rem; background: var(--accent-rose);" onclick="document.getElementById('occupied-room-modal').classList.remove('open'); openBookingModal(AppState.selectedSpace, true);">
           🚨 Request Urgent Override
         </button>
@@ -2058,7 +2057,7 @@
         });
       }
 
-      // Render Occupied Rooms Section (Standby Waitlist + Urgent Override)
+      // Render Occupied Rooms Section (Urgent Override)
       const occSection = document.getElementById('occupied-rooms-section');
       const occGrid = document.getElementById('occupied-rooms-grid');
       const occBadge = document.getElementById('occupied-count-badge');
@@ -2073,7 +2072,8 @@
             if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
             if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
 
-            const statusLabel = room.conflicting_status === 'Scanned' ? 'Physically Occupied (Scanned)' : (room.conflicting_status || 'Reserved');
+            const isScanned = room.conflicting_status === 'Scanned';
+            const statusLabel = isScanned ? 'Physically Occupied (Scanned)' : (room.conflicting_status || 'Reserved');
 
             return `
               <div class="room-card" style="border: 1.5px solid #fca5a5;">
@@ -2088,16 +2088,19 @@
                     ${room.current_occupant ? `<span class="pill-tag tag-neutral">Occupant: ${room.current_occupant}</span>` : ''}
                   </div>
                   <p style="font-size: 0.82rem; color: #991b1b; margin-bottom: 0.75rem;">
-                    This space is currently reserved. You can join the 3-min Standby queue or submit an urgent override request.
+                    ${isScanned ? 'This space is physically occupied and verified via door QR.' : 'This space currently has an unverified booking. You can request an urgent override.'}
                   </p>
                 </div>
                 <div class="room-card-footer" style="flex-direction: column; gap: 0.5rem; align-items: stretch;">
-                  <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.5rem;" onclick="joinStandbyWaitlist('${room.id}')">
-                    ⏳ Join Standby Waitlist
-                  </button>
-                  <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.5rem; background: var(--accent-rose);" onclick='openBookingModal(${JSON.stringify(room)}, true)'>
-                    🚨 Request Urgent Override
-                  </button>
+                  ${isScanned ? `
+                    <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.5rem; opacity: 0.6; cursor: not-allowed;" disabled>
+                      🔒 Occupied (Physically Checked In)
+                    </button>
+                  ` : `
+                    <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.5rem; background: var(--accent-rose);" onclick='openBookingModal(${JSON.stringify(room)}, true)'>
+                      🚨 Request Urgent Override
+                    </button>
+                  `}
                 </div>
               </div>
             `;
@@ -2105,28 +2108,6 @@
         } else {
           occSection.style.display = 'none';
         }
-      }
-    }
-
-    async function joinStandbyWaitlist(spaceId) {
-      if (!AppState.searchParams || !AppState.searchParams.startTime) {
-        showToast('Please search for a timeframe first before joining standby queue.', 'warning');
-        return;
-      }
-      try {
-        const payload = {
-          space_id: spaceId,
-          requested_start: AppState.searchParams.startTime,
-          requested_end: AppState.searchParams.endTime
-        };
-        const res = await apiRequest('/api/standby/join', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        showToast(res.message || 'Successfully queued on Standby Waitlist! You will receive a 3-minute Flash Claim if the room auto-releases.', 'success');
-        switchStudentTab('dashboard');
-      } catch (err) {
-        console.error('Join standby error:', err);
       }
     }
 
@@ -2139,7 +2120,7 @@
       }
       const promptText = input.value.trim();
       const oldText = btn.innerHTML;
-      btn.innerHTML = '<span>⏳ Thinking...</span>';
+      btn.innerHTML = '<span>⏳ Booking...</span>';
       btn.disabled = true;
 
       try {
@@ -2148,20 +2129,17 @@
           body: JSON.stringify({ prompt: promptText })
         });
 
-        if (parsed.start_time && parsed.end_time) {
-          document.getElementById('search-start').value = toLocalISOString(new Date(parsed.start_time));
-          document.getElementById('search-end').value = toLocalISOString(new Date(parsed.end_time));
+        if (parsed.success && parsed.booked_room) {
+          showToast(`🤖 AI Auto-Booked: ${parsed.booked_room}!`, 'success');
+          input.value = '';
+          loadStudentDashboard();
+          if (typeof loadLiveRoomStatus === 'function') {
+            loadLiveRoomStatus('student-live-status-container', true);
+          }
+          switchStudentTab('dashboard');
+        } else {
+          showToast(parsed.message || parsed.summary || 'Could not auto-book a room for this timeframe.', 'warning');
         }
-        if (parsed.capacity) {
-          document.getElementById('search-capacity').value = parsed.capacity;
-        }
-        if (parsed.acoustic_profile) {
-          document.getElementById('search-acoustic').value = parsed.acoustic_profile;
-        }
-
-        showToast(`✨ AI Parsed: ${parsed.summary}`, 'success');
-        handleStartTimeChange();
-        handleSearch();
       } catch (err) {
         console.error('AI quick book error:', err);
         showToast('AI could not parse instruction. Please enter details manually.', 'error');
@@ -2460,6 +2438,9 @@
         } else {
           showToast('Reservation confirmed! Instant allocation auto-approved.', 'success');
         }
+        if (typeof loadLiveRoomStatus === 'function') {
+          loadLiveRoomStatus('student-live-status-container', true);
+        }
         switchStudentTab('dashboard');
       } catch (err) {
         console.error('Booking submission error:', err);
@@ -2518,14 +2499,12 @@
         `;
       }
 
-      // 2. Active QR Booking Card
+      // 2. Active Booking Card (Door QR Scanning only - No QR on student screen)
       const activeContainer = document.getElementById('active-booking-container');
       const bookedReservation = (data.active_bookings || []).find(b => b.status === 'Booked') ||
                                 (data.active_bookings || []).find(b => b.status === 'Scanned' && (new Date(b.end_time) - new Date(b.start_time)) / 3600000 > 1);
 
       if (bookedReservation) {
-        const qrData = `CAMPUS_CHECKIN:${bookedReservation.id}:${bookedReservation.user_id}`;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`;
         const roomTitle = getRoomName(bookedReservation);
         const durationHours = (new Date(bookedReservation.end_time) - new Date(bookedReservation.start_time)) / 3600000;
         let hourlyNotice = '';
@@ -2542,42 +2521,47 @@
           `;
         }
 
-        const actionBadge = bookedReservation.status === 'Scanned'
+        const isScanned = bookedReservation.status === 'Scanned';
+        const actionBadge = isScanned
           ? '● CHECKED IN &bull; HOURLY RE-VERIFICATION ACTIVE'
           : 'ACTION REQUIRED &bull; 15-MIN PHYSICAL CHECK-IN';
-        const actionBtnLabel = bookedReservation.status === 'Scanned'
+        const actionBtnLabel = isScanned
           ? '📷 Scan Door QR / Hourly Re-Verify'
-          : '📷 Scan QR / Verify Physical Check-In';
+          : '📷 Open Camera to Scan Door QR';
 
         activeContainer.innerHTML = `
-          <div class="checkin-hero-card">
-            <div class="checkin-info">
-              <span class="pill-tag tag-blue" style="margin-bottom: 0.65rem;">${actionBadge}</span>
-              <h3>${roomTitle}</h3>
-              <p style="color: var(--text-secondary); margin-bottom: 0.75rem; font-size: 0.95rem;">
+          <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+            <div class="checkin-info" style="flex: 1; min-width: 260px;">
+              <span class="pill-tag ${isScanned ? 'tag-emerald' : 'tag-amber'}" style="margin-bottom: 0.65rem;">${actionBadge}</span>
+              <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
+              <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
                 🕒 <strong>Slot:</strong> ${formatDateTime(bookedReservation.start_time)} - ${formatDateTime(bookedReservation.end_time)}
               </p>
-              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
                 🎯 <strong>Purpose:</strong> ${bookedReservation.purpose}
               </p>
 
               ${bookedReservation.accompanying_count > 0 ? `
-                <div class="attendees-summary">
+                <div class="attendees-summary" style="margin-bottom: 0.75rem;">
                   👥 <strong>Group Reservation (${bookedReservation.accompanying_count + 1} People):</strong> Includes ${bookedReservation.accompanying_count} verified accompanying attendees.
                 </div>
               ` : ''}
 
               ${hourlyNotice}
-
-              <div style="margin-top: 1.5rem;">
-                <button class="btn-pill-dark" onclick="verifyQRCheckIn('${bookedReservation.id}', '${bookedReservation.space_id}')">
-                  ${actionBtnLabel}
-                </button>
-              </div>
             </div>
-            <div class="qr-container">
-              <img src="${qrUrl}" alt="Check-In QR Code">
-              <div class="qr-timer">⏱️ 15-Min Grace Window Active</div>
+
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 230px;">
+              <div style="background: rgba(30, 41, 59, 0.05); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; width: 100%; border: 1px solid var(--border);">
+                <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
+                  ${isScanned ? '⏱️ HOURLY RE-SCAN ACTIVE' : '⏱️ 15-MIN CHECK-IN WINDOW'}
+                </div>
+                <div style="font-size: 0.78rem; color: var(--text-secondary);">
+                  ${isScanned ? 'Physical presence verified' : 'Scan physical door plaque to confirm'}
+                </div>
+              </div>
+              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="openCameraScanner('${bookedReservation.id}', '${bookedReservation.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
+                ${actionBtnLabel}
+              </button>
             </div>
           </div>
         `;
@@ -2640,92 +2624,180 @@
       }
     }
 
-    // Camera QR Scanner Variables & Logic
+    // Camera QR Scanner Variables & Logic with Strict Validation
     let activeScanningResId = null;
     let activeScanningSpaceId = null;
+    let activeScanningRoomName = null;
     let html5QrScanner = null;
+    let isScanningActive = false;
+    let scanCooldown = false;
 
-    function openCameraScanner(reservationId, spaceId = null) {
+    function extractSpaceIdFromQR(text) {
+      if (!text || typeof text !== 'string') return null;
+      text = text.trim();
+
+      // Pattern 1: CAMPUS_ROOM_QR::space_id=XYZ
+      const match1 = text.match(/CAMPUS_ROOM_QR::space_id=([a-f0-9\-]+)/i);
+      if (match1) return match1[1];
+
+      // Pattern 2: URL with query or hash param ?space_id=XYZ or #scan?space_id=XYZ
+      const match2 = text.match(/[?&#]space_id=([a-f0-9\-]+)/i);
+      if (match2) return match2[1];
+
+      // Pattern 3: Direct UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(text)) return text;
+
+      return null;
+    }
+
+    function openCameraScanner(reservationId, spaceId = null, roomName = null) {
       activeScanningResId = reservationId;
       activeScanningSpaceId = spaceId;
+      activeScanningRoomName = roomName || 'Campus Room';
+
       const modal = document.getElementById('camera-scanner-modal');
-      if (modal) modal.classList.add('open');
+      if (modal) {
+        modal.classList.add('open');
+        modal.style.display = 'flex';
+      }
+
+      const subtitle = document.getElementById('camera-scanner-subtitle');
+      if (subtitle) {
+        subtitle.innerHTML = `Point your camera at the physical plaque for <strong>${activeScanningRoomName}</strong>.`;
+      }
 
       const notice = document.getElementById('camera-scanner-notice');
       if (notice) notice.innerHTML = '';
 
+      startCameraScannerInstance();
+    }
+
+    function startCameraScannerInstance() {
+      if (isScanningActive) return;
+      const notice = document.getElementById('camera-scanner-notice');
+
       if (typeof Html5Qrcode === 'undefined') {
-        if (notice) notice.innerHTML = '<span style="color: var(--accent-amber);">Camera QR scanner library loading... Use manual fallback below if needed.</span>';
+        if (notice) notice.innerHTML = '<span style="color: #dc2626; font-weight: 600;">❌ QR Scanner library failed to load. Please check your network connection.</span>';
         return;
       }
 
       try {
-        if (html5QrScanner) {
-          html5QrScanner.stop().catch(() => {}).finally(() => {
-            try { html5QrScanner.clear(); } catch (_) {}
-            startCameraScannerInstance();
-          });
-        } else {
-          startCameraScannerInstance();
-        }
+        html5QrScanner = new Html5Qrcode("camera-scanner-reader");
+        const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+        isScanningActive = true;
+
+        html5QrScanner.start(
+          { facingMode: "environment" },
+          config,
+          async (decodedText) => {
+            handleScannedCode(decodedText);
+          },
+          (error) => {}
+        ).catch(err => {
+          console.warn('Camera access unavailable:', err);
+          isScanningActive = false;
+          if (notice) {
+            notice.innerHTML = '<span style="color: #dc2626; font-weight: 600;">⚠️ Camera permission denied or no webcam detected. Please grant camera access in your browser.</span>';
+          }
+        });
       } catch (err) {
         console.warn('Camera scanner init err:', err);
+        isScanningActive = false;
       }
     }
 
-    function startCameraScannerInstance() {
-      html5QrScanner = new Html5Qrcode("camera-scanner-reader");
-      const config = { fps: 10, qrbox: { width: 220, height: 220 } };
-      html5QrScanner.start(
-        { facingMode: "environment" },
-        config,
-        async (decodedText) => {
-          try {
-            await html5QrScanner.stop();
-            html5QrScanner.clear();
-          } catch (_) {}
-          closeCameraScanner();
+    async function handleScannedCode(decodedText) {
+      if (scanCooldown) return;
+      const notice = document.getElementById('camera-scanner-notice');
+      const scannedSpaceId = extractSpaceIdFromQR(decodedText);
 
-          if (activeScanningSpaceId && !decodedText.includes(activeScanningSpaceId) && !decodedText.includes('CAMPUS_CHECKIN')) {
-            showToast('Scanned QR code does not match this room door!', 'error');
-            return;
-          }
-
-          await executeQRCheckin(activeScanningResId);
-        },
-        (error) => {}
-      ).catch(err => {
-        console.warn('Camera access unavailable:', err);
-        const notice = document.getElementById('camera-scanner-notice');
-        if (notice) notice.innerHTML = '<span style="color: var(--accent-rose);">⚠️ Camera access unavailable. Please use the button below to verify.</span>';
-      });
-    }
-
-    function closeCameraScanner() {
-      if (html5QrScanner) {
-        html5QrScanner.stop().catch(() => {}).finally(() => {
-          try { html5QrScanner.clear(); } catch (_) {}
-        });
+      // Case A: Random / Non-Campus QR Code
+      if (!scannedSpaceId) {
+        scanCooldown = true;
+        const msg = '❌ Invalid QR Code! This is not an official Campus Resource Hub room plaque.';
+        if (notice) {
+          notice.innerHTML = `<div style="background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; padding: 0.65rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">${msg}</div>`;
+        }
+        showToast(msg, 'error');
+        setTimeout(() => { scanCooldown = false; }, 2500);
+        return;
       }
-      const modal = document.getElementById('camera-scanner-modal');
-      if (modal) modal.classList.remove('open');
-    }
 
-    async function verifyQRCheckInDirectlyFallback() {
-      const resId = activeScanningResId;
-      closeCameraScanner();
-      if (resId) {
-        await executeQRCheckin(resId);
+      // Case B: Valid Campus QR, but Wrong Room
+      if (activeScanningSpaceId && String(scannedSpaceId).toLowerCase() !== String(activeScanningSpaceId).toLowerCase()) {
+        scanCooldown = true;
+        const allRooms = window.liveStatusRooms || AppState.allSpaces || [];
+        const scannedRoom = allRooms.find(s => String(s.id).toLowerCase() === String(scannedSpaceId).toLowerCase());
+        const scannedRoomName = scannedRoom ? scannedRoom.name : 'a different room';
+        const msg = `❌ Wrong Room QR Scanned! You booked ${activeScanningRoomName}, but scanned the QR code for ${scannedRoomName}.`;
+        if (notice) {
+          notice.innerHTML = `<div style="background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; padding: 0.65rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">${msg}</div>`;
+        }
+        showToast(msg, 'error');
+        setTimeout(() => { scanCooldown = false; }, 2500);
+        return;
       }
-    }
 
-    async function executeQRCheckin(reservationId) {
+      // Case C: Exact Match!
+      scanCooldown = true;
+      if (notice) {
+        notice.innerHTML = `<div style="background: #dcfce7; border: 1.5px solid #16a34a; color: #166534; padding: 0.65rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">✅ Room QR Verified! Checking in...</div>`;
+      }
+
       try {
-        const res = await apiRequest(`/api/bookings/${reservationId}/scan-qr`, { method: 'POST' });
-        showToast(res.message || 'QR Check-In Verified! Room is officially Scanned.', 'success');
+        const resId = activeScanningResId;
+        const verifiedRoomName = activeScanningRoomName;
+        await closeCameraScanner();
+
+        const res = await apiRequest(`/api/bookings/${resId}/scan-qr`, {
+          method: 'POST',
+          body: JSON.stringify({ scanned_space_id: scannedSpaceId })
+        });
+
+        showToast(`✅ Physical check-in verified for ${verifiedRoomName}!`, 'success');
         loadStudentDashboard();
+        if (typeof loadLiveRoomStatus === 'function') {
+          loadLiveRoomStatus('student-live-status-container', true);
+        }
       } catch (err) {
-        console.error('QR Check-In error:', err);
+        console.error('Scan QR verification error:', err);
+        showToast(err.message || 'Check-in failed. Please verify with admin.', 'error');
+      } finally {
+        scanCooldown = false;
+      }
+    }
+
+    async function closeCameraScanner() {
+      try {
+        if (html5QrScanner) {
+          if (html5QrScanner.isScanning) {
+            await html5QrScanner.stop();
+          }
+          html5QrScanner.clear();
+        }
+      } catch (err) {
+        console.warn('Error stopping html5QrScanner:', err);
+      } finally {
+        try {
+          const videoElem = document.querySelector('#camera-scanner-reader video');
+          if (videoElem && videoElem.srcObject) {
+            const stream = videoElem.srcObject;
+            if (stream.getTracks) {
+              stream.getTracks().forEach(t => t.stop());
+            }
+          }
+        } catch (_) {}
+        html5QrScanner = null;
+        activeScanningResId = null;
+        activeScanningSpaceId = null;
+        activeScanningRoomName = null;
+        isScanningActive = false;
+        const modal = document.getElementById('camera-scanner-modal');
+        if (modal) {
+          modal.classList.remove('open');
+          modal.style.display = 'none';
+        }
       }
     }
 
@@ -2972,8 +3044,28 @@
         await apiRequest(`/api/admin/reservations/${reservationId}/cancel`, { method: 'POST' });
         showToast('Reservation revoked and cancelled. Room is released back to campus inventory.', 'success');
         loadAdminData();
+        if (typeof loadLiveRoomStatus === 'function') {
+          loadLiveRoomStatus('admin-live-status-container', false);
+        }
       } catch (err) {
         console.error('Cancel reservation failed:', err);
+      }
+    }
+
+    async function adminCancelAllReservations() {
+      if (!confirm('⚠️ Are you sure you want to cancel ALL active and pending reservations and reset all user quotas? This will immediately free up all rooms on campus.')) {
+        return;
+      }
+      try {
+        const res = await apiRequest('/api/admin/reservations/cancel-all', { method: 'POST' });
+        showToast(res.message || 'All reservations cancelled and quotas reset!', 'success');
+        loadAdminData();
+        if (typeof loadLiveRoomStatus === 'function') {
+          loadLiveRoomStatus('admin-live-status-container', false);
+        }
+      } catch (err) {
+        console.error('Cancel all reservations failed:', err);
+        showToast('Failed to cancel all reservations.', 'error');
       }
     }
 
@@ -3090,11 +3182,14 @@
       document.getElementById('plaque-room-cap').textContent = `Cap: ${space.capacity} seats`;
       document.getElementById('plaque-room-acoustic').textContent = `Acoustic: ${space.acoustic_profile}`;
 
-      const scanUrl = `${window.location.origin}/#scan?space_id=${encodeURIComponent(space.id)}`;
-      document.getElementById('plaque-url-text').textContent = scanUrl;
+      const plaquePayload = `CAMPUS_ROOM_QR::space_id=${space.id}::name=${encodeURIComponent(space.name)}`;
+      const plaqueUrl = document.getElementById('plaque-url-text');
+      if (plaqueUrl) {
+        plaqueUrl.textContent = `Official University Door Plaque • ID: ${space.id}`;
+      }
 
       const qrImg = document.getElementById('plaque-qr-img');
-      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(scanUrl)}`;
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(plaquePayload)}`;
 
       document.getElementById('room-qr-modal').classList.add('open');
     }
@@ -3118,6 +3213,8 @@
 
       try {
         const rooms = await apiRequest('/api/rooms/live-status');
+        window.liveStatusRooms = rooms;
+        AppState.allSpaces = rooms;
         const total = rooms.length;
         const occupied = rooms.filter(r => r.is_occupied).length;
         const available = total - occupied;
@@ -3209,13 +3306,13 @@
                   const subText = `${roomObj.capacity} Seats • ${roomObj.acoustic_profile}`;
 
                   return `
-                    <g style="cursor: pointer;" onclick="handleFloorPlanRoomClick('${roomObj.id}')">
-                      <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" />
-                      <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B">${roomObj.name}</text>
-                      <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B">${subText}</text>
-                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="80" height="20" rx="10" fill="${isOcc ? '#fecaca' : '#bbf7d0'}" />
-                      <text x="${cfg.x + 54}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}">${badgeText}</text>
-                      <text x="${cfg.x + cfg.w - 14}" y="${cfg.y + 74}" text-anchor="end" font-size="9.5" font-weight="600" fill="#475569">Click ↗</text>
+                    <g style="cursor: pointer; pointer-events: all;" onclick="window.handleFloorPlanRoomClick('${roomObj.id}')">
+                      <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" style="pointer-events: none;" />
+                      <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B" style="pointer-events: none;">${roomObj.name}</text>
+                      <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B" style="pointer-events: none;">${subText}</text>
+                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="80" height="20" rx="10" fill="${isOcc ? '#fecaca' : '#bbf7d0'}" style="pointer-events: none;" />
+                      <text x="${cfg.x + 54}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}" style="pointer-events: none;">${badgeText}</text>
+                      <text x="${cfg.x + cfg.w - 14}" y="${cfg.y + 74}" text-anchor="end" font-size="9.5" font-weight="600" fill="#475569" style="pointer-events: none;">Click ↗</text>
                     </g>
                   `;
                 }).join('')}
@@ -3313,15 +3410,28 @@
       }
     }
 
-    function handleFloorPlanRoomClick(roomId) {
-      const room = (AppState.allSpaces || []).find(s => s.id === roomId);
+    window.handleFloorPlanRoomClick = function(roomId) {
+      const rooms = window.liveStatusRooms || AppState.allSpaces || [];
+      const room = rooms.find(s => String(s.id).toLowerCase() === String(roomId).toLowerCase());
       if (!room) return;
       if (!room.is_occupied) {
         quickBookSpaceFromLive(room);
       } else {
-        openOccupiedRoomModal(room);
+        const currentRes = room.current_reservation;
+        if (currentRes && currentRes.status === 'Scanned') {
+          showToast('ℹ️ Room is physically occupied and verified via QR.', 'info');
+          return;
+        }
+        initializeDateTimeInputs();
+        AppState.searchParams = {
+          startTime: document.getElementById('search-start').value,
+          endTime: document.getElementById('search-end').value,
+          capacity: 1,
+          acousticProfile: room.acoustic_profile
+        };
+        openBookingModal(room, true);
       }
-    }
+    };
 
     function openOccupiedRoomModal(room) {
       AppState.selectedSpace = room;

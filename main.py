@@ -5,11 +5,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, status, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 from sqlalchemy.orm import Session, joinedload
 
 from database import engine, Base, get_db, SessionLocal
@@ -36,6 +36,7 @@ from schemas import (
     AdminHistoryItemResponse,
     AdminProfileResponse,
     QRScanResponse,
+    QRScanRequest,
     AIParsedBookingRequest,
     AIParsedBookingResponse,
 )
@@ -169,13 +170,15 @@ def list_spaces(db: Session = Depends(get_db)):
 
 
 @app.get("/api/rooms/live-status", tags=["Spaces"])
-def get_rooms_live_status(db: Session = Depends(get_db)):
+def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
     """
     Returns real-time occupancy status for all campus spaces.
     Identifies whether each space is currently 'Vacant / Free' or 'Occupied / In-Use',
     along with occupant and upcoming scheduled booking.
     """
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     now_utc = datetime.utcnow()
+    now_local = datetime.now()
     spaces = db.query(Space).order_by(Space.name.asc()).all()
 
     active_statuses = [ReservationStatus.BOOKED, ReservationStatus.SCANNED]
@@ -188,9 +191,12 @@ def get_rooms_live_status(db: Session = Depends(get_db)):
             .filter(
                 Reservation.space_id == s.id,
                 Reservation.status.in_(active_statuses),
-                Reservation.start_time <= now_utc,
-                Reservation.end_time > now_utc,
+                or_(
+                    and_(Reservation.start_time <= now_utc + timedelta(minutes=15), Reservation.end_time > now_utc),
+                    and_(Reservation.start_time <= now_local + timedelta(minutes=15), Reservation.end_time > now_local),
+                ),
             )
+            .order_by(Reservation.start_time.asc())
             .first()
         )
 
@@ -200,7 +206,10 @@ def get_rooms_live_status(db: Session = Depends(get_db)):
             .filter(
                 Reservation.space_id == s.id,
                 Reservation.status.in_(active_statuses),
-                Reservation.start_time > now_utc,
+                or_(
+                    Reservation.start_time > now_utc + timedelta(minutes=15),
+                    Reservation.start_time > now_local + timedelta(minutes=15),
+                ),
             )
             .order_by(Reservation.start_time.asc())
             .first()
@@ -583,15 +592,17 @@ def create_booking(
 @app.post("/api/bookings/{reservation_id}/scan-qr", response_model=QRScanResponse, tags=["Student Portal"])
 def scan_qr_checkin(
     reservation_id: uuid.UUID,
+    payload: Optional[QRScanRequest] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     QR Check-in verification:
     Validates that:
-    1. Reservation belongs to student (or admin).
-    2. Current status is 'Booked'.
-    3. current_time is between start_time - 5 mins and start_time + 15 mins.
+    1. Scanned QR matches the booked room space_id.
+    2. Reservation belongs to student (or admin).
+    3. Current status is 'Booked'.
+    4. current_time is within valid check-in grace period.
     Updates status to 'Scanned'.
     """
     reservation = (
@@ -613,6 +624,14 @@ def scan_qr_checkin(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not authorized to check into this reservation",
         )
+
+    # Strict QR room match verification
+    if payload and payload.scanned_space_id:
+        if str(payload.scanned_space_id).strip().lower() != str(reservation.space_id).strip().lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Room QR: Scanned QR code does not match the booked room.",
+            )
 
     # Validate status
     if reservation.status == ReservationStatus.SCANNED:
@@ -1084,15 +1103,35 @@ def admin_cancel_reservation(
     )
 
 
+@app.post("/api/admin/reservations/cancel-all", tags=["Admin Portal"])
+def admin_cancel_all_reservations(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Wipes/cancels all reservations, resets all users' total_bookings and urgent_requests_used.
+    Ensures all 6 campus rooms become 100% Free/Available immediately.
+    """
+    db.query(Reservation).delete()
+    db.query(StandbyWaitlist).delete()
+    db.query(User).update({User.total_bookings: 0, User.urgent_requests_used: 0})
+    db.commit()
+    return {"message": "All campus reservations have been successfully cancelled. All rooms are now 100% Free/Available."}
+
+
 # =====================================================================
 # AI Natural Language Quick Book Engine
 # =====================================================================
 @app.post("/api/ai/parse-booking", response_model=AIParsedBookingResponse, tags=["AI Engine"])
-def ai_parse_booking(payload: AIParsedBookingRequest):
+def ai_parse_booking(
+    payload: AIParsedBookingRequest,
+    db: Session = Depends(get_db),
+):
     """
     Parses conversational natural language booking instructions:
     e.g. "Book a silent room for 3 people tomorrow at 3 PM for project discussion"
-    Extracts capacity, acoustic profile, start/end time, and purpose.
+    Extracts capacity, acoustic profile, start/end time, purpose, finds the best
+    available matching room, and IMMEDIATELY creates the Booked reservation!
     """
     text = payload.prompt.strip().lower()
     now = datetime.now()
@@ -1123,7 +1162,6 @@ def ai_parse_booking(payload: AIParsedBookingRequest):
     # 4. Time Resolution
     hour = None
     minute = 0
-    # Match patterns like "3 pm", "3:30 pm", "15:00", "at 4"
     time_match = re.search(r'(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', text)
     if time_match:
         h = int(time_match.group(1))
@@ -1141,7 +1179,7 @@ def ai_parse_booking(payload: AIParsedBookingRequest):
             hour = h
             minute = m
 
-    # Relative time: "in 1 hour", "in 2 hours"
+    # Relative time: "in 1 hour", "in 2 hours", "now"
     rel_match = re.search(r'in\s+(\d+)\s*hours?', text)
     if rel_match:
         rel_hrs = int(rel_match.group(1))
@@ -1149,39 +1187,108 @@ def ai_parse_booking(payload: AIParsedBookingRequest):
         target_date = future_time.date()
         hour = future_time.hour
         minute = future_time.minute
+    elif "now" in text:
+        hour = now.hour
+        minute = now.minute
 
     if hour is None:
-        # Default to upcoming hour today or tomorrow morning
         default_next = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
         hour = default_next.hour
         minute = 0
 
     start_dt = datetime(target_date.year, target_date.month, target_date.day, hour, minute)
     if start_dt < now and "tomorrow" not in text and target_date == now.date():
-        # If time has passed today, move to tomorrow
         start_dt += timedelta(days=1)
 
-    # Duration Extraction (default 1 hour)
     duration_match = re.search(r'for\s+(\d+)\s*(?:hours?|hrs?)', text)
     duration_hrs = int(duration_match.group(1)) if duration_match else 1
     end_dt = start_dt + timedelta(hours=duration_hrs)
 
-    # 5. Purpose Extraction
     purpose = "Collaborative Academic Project Session"
     purpose_match = re.search(r'for\s+([a-zA-Z0-9\s&]+?)(?:\s+(?:tomorrow|today|at\s+\d+|in\s+\d+)|$)', payload.prompt, re.IGNORECASE)
     if purpose_match:
         candidate = purpose_match.group(1).strip()
-        # Clean out common capacity/time words from purpose
         if not re.search(r'^\d+\s*(?:people|person|students?|hours?|hrs?)$', candidate, re.IGNORECASE):
             purpose = candidate.capitalize()
 
-    summary = f"{capacity} people • {acoustic_profile} • {start_dt.strftime('%b %d, %I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+    # Find Available Space & Directly Book It
+    blocking_statuses = [
+        ReservationStatus.PENDING_PERMISSION,
+        ReservationStatus.BOOKED,
+        ReservationStatus.SCANNED,
+    ]
+    busy_space_ids = {
+        r.space_id
+        for r in db.query(Reservation.space_id)
+        .filter(
+            Reservation.status.in_(blocking_statuses),
+            Reservation.start_time < end_dt,
+            Reservation.end_time > start_dt,
+        )
+        .all()
+    }
 
-    return AIParsedBookingResponse(
-        capacity=capacity,
-        acoustic_profile=acoustic_profile,
-        start_time=start_dt,
-        end_time=end_dt,
-        purpose=purpose,
-        summary=summary,
+    match_query = db.query(Space).filter(
+        Space.capacity >= capacity,
+        Space.acoustic_profile == acoustic_profile,
     )
+    if busy_space_ids:
+        match_query = match_query.filter(~Space.id.in_(busy_space_ids))
+    best_room = match_query.order_by(Space.capacity.asc()).first()
+
+    if not best_room:
+        fallback_query = db.query(Space).filter(Space.capacity >= capacity)
+        if busy_space_ids:
+            fallback_query = fallback_query.filter(~Space.id.in_(busy_space_ids))
+        best_room = fallback_query.order_by(Space.capacity.asc()).first()
+
+    if best_room:
+        user = db.query(User).filter(User.role == UserRole.STUDENT).first()
+        if not user:
+            user = db.query(User).first()
+        user_id = user.id if user else "student"
+
+        new_res = Reservation(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            space_id=best_room.id,
+            purpose=purpose,
+            accompanying_count=max(0, capacity - 1),
+            accompanying_students=[],
+            start_time=start_dt,
+            end_time=end_dt,
+            status=ReservationStatus.BOOKED,
+            is_urgent=False,
+            created_at=datetime.utcnow(),
+        )
+        if user:
+            user.total_bookings += 1
+        db.add(new_res)
+        db.commit()
+        db.refresh(new_res)
+
+        summary_text = f"{best_room.name} ({capacity} pax, {best_room.acoustic_profile.value}) • {start_dt.strftime('%b %d, %I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+
+        return AIParsedBookingResponse(
+            success=True,
+            booked_room=best_room.name,
+            reservation_id=str(new_res.id),
+            capacity=capacity,
+            acoustic_profile=best_room.acoustic_profile.value,
+            start_time=start_dt,
+            end_time=end_dt,
+            purpose=purpose,
+            summary=summary_text,
+            message=f"Successfully auto-booked {best_room.name}!",
+        )
+    else:
+        return AIParsedBookingResponse(
+            success=False,
+            capacity=capacity,
+            acoustic_profile=acoustic_profile,
+            start_time=start_dt,
+            end_time=end_dt,
+            purpose=purpose,
+            summary=f"No rooms free for {capacity} people at {start_dt.strftime('%b %d, %I:%M %p')}",
+            message="All campus rooms matching this request are reserved during this slot.",
+        )

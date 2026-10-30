@@ -230,12 +230,20 @@ class AIParsedBookingRequest(BaseModel):
 
 
 class AIParsedBookingResponse(BaseModel):
+    success: bool = True
+    booked_room: Optional[str] = None
+    reservation_id: Optional[str] = None
     capacity: int = 1
     acoustic_profile: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     purpose: Optional[str] = None
     summary: str
+    message: Optional[str] = None
+
+
+class QRScanRequest(BaseModel):
+    scanned_space_id: Optional[str] = None
 
 
 # ==========================================
