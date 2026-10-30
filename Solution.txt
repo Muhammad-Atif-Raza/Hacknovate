@@ -1,0 +1,40 @@
+Proposed Solution: Intelligent Campus Resource Management and Optimisation Platform
+We propose an AI-powered Intelligent Campus Resource Management Platform that centralises the reservation, verification, monitoring and allocation of campus spaces and equipment. The platform replaces informal booking methods such as WhatsApp conversations, verbal agreements and paper registers with a unified, transparent and automated scheduling system.
+
+It integrates conflict-free booking algorithms, regression-based demand forecasting, QR-based physical verification, interactive campus navigation and dynamic resource reallocation to ensure that campus facilities are utilised efficiently.
+
+The platform will incorporate the following key features:
+1. Unified Conflict-Free Scheduling Hub
+UI Focus: A centralised, hard-locked digital booking grid.
+
+Mechanism: Replaces informal booking methods with a centralised scheduling system that automatically prevents overlapping reservations. Once a room or facility is booked, the corresponding time slot is locked for other users, eliminating double-bookings and ensuring transparent access to campus resources.
+2. Regression-Based Smart Slot Suggester
+UI Focus: An intelligent recommendation widget displayed when users select congested or unavailable time slots.
+
+Mechanism: Uses a feature-driven regression model trained on historical booking patterns, occupancy records, academic schedules, weekdays and campus events to forecast peak resource demand. It recommends optimal alternative slots and suitable facilities, helping distribute demand more evenly across the campus.
+3. Interactive Campus Resource Map
+UI Focus: A real-time, interactive campus map displaying buildings, rooms and resource availability.
+
+Mechanism: Integrates location-based resource tracking with the booking system to help students identify nearby available facilities. Users can filter spaces according to capacity, equipment, acoustic profiles and availability. It also provides dynamic navigation when bookings are relocated due to maintenance or emergencies.
+4. Strict 15-Minute QR Verification Portal
+UI Focus: A dedicated QR-based check-in interface with a live countdown timer.
+
+Mechanism: Every bookable space is assigned a unique QR code that users must scan within 15 minutes of their reservation's starting time. If no valid check-in is recorded before the countdown expires, the reservation is automatically revoked and the slot becomes available again. This ensures that only physically occupied reservations remain active, significantly reducing ghost bookings.
+5. Incident Re-Routing and Admin Safety Override
+UI Focus: An Admin Emergency Lockout toggle and a Student Auto-Reassignment notification banner.
+
+Mechanism: Allows authorised administrators to immediately mark rooms or equipment as unavailable due to maintenance, technical failures or emergencies. The system automatically identifies nearby vacant spaces with matching capacity and facilities, reallocates affected bookings and sends updated booking details with navigation instructions to students.
+6. Acoustic and Noise Profile Indexing
+UI Focus: Dynamic sound-profile badges displayed alongside every available resource.
+
+Mechanism: Classifies campus spaces according to their permitted noise levels and acoustic characteristics, using categories such as Silent Study Zone, Collaborative Discussion and Amplified Sound Permitted. The system uses these classifications during scheduling to minimise noise interference between simultaneously occupied or adjacent spaces.
+7. Dynamic Standby Queue and 3-Minute Flash Claim
+UI Focus: A Join Standby Queue button for unavailable or pending booking slots, accompanied by real-time claim notifications.
+
+Mechanism: Maintains an automated waiting list for occupied or reserved facilities. When a reservation is automatically released following a 15-minute no-show, the first eligible waitlisted user receives a priority notification and a 3-minute window to claim the newly available slot. If the user does not respond, the opportunity automatically passes to the next person in the queue before the slot returns to general availability.
+
+Overall Objective
+
+The proposed platform aims to transform campus resource management from a manual, reservation-based process into an intelligent, occupancy-driven ecosystem. By combining automated scheduling, machine-learning-based demand prediction, physical verification, location intelligence and dynamic resource allocation, it minimises resource wastage, improves accessibility and ensures fair and transparent utilisation of campus infrastructure.
+
+One technical consideration for your implementation: The regression model should forecast demand, while a separate scheduling and optimisation algorithm handles slot allocation. Also, QR verification confirms check-in rather than continuous occupancy, so an optional IoT integration could strengthen actual occupancy monitoring.
