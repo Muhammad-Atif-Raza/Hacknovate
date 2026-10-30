@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: cph_postgres
+    environment:
+      POSTGRES_USER: campus_user
+      POSTGRES_PASSWORD: campus_password
+      POSTGRES_DB: campus_hub
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cph_backend
+    environment:
+      DATABASE_URL: postgresql://campus_user:campus_password@db:5432/campus_hub
+      SECRET_KEY: campus-hub-production-secret-key-replace-in-real-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000/api
+    container_name: cph_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
