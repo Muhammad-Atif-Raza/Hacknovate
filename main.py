@@ -225,15 +225,15 @@ def get_user_dashboard(
 
 @app.get("/api/rooms/search", response_model=RoomSearchResponse, tags=["Student Portal"])
 def search_rooms(
-    capacity: int = Query(..., gt=0, description="Minimum room capacity"),
+    capacity: int = Query(..., gt=0, description="Minimum room capacity (1-100)"),
     start_time: datetime = Query(..., description="Desired start time (ISO 8601)"),
     end_time: datetime = Query(..., description="Desired end time (ISO 8601)"),
-    acoustic_profile: AcousticProfile = Query(..., description="Acoustic environment preference"),
+    acoustic_profile: Optional[AcousticProfile] = Query(None, description="Acoustic environment preference"),
     db: Session = Depends(get_db),
 ):
     """
     Conflict-Free Search with Smart ML Fallback:
-    1. Queries Space where capacity >= requested and acoustic_profile == requested,
+    1. Queries Space where capacity >= requested and acoustic_profile == requested (if provided),
        excluding rooms with conflicting reservations (status IN Pending_Permission, Booked, Scanned).
     2. Smart ML Fallback: If 0 rooms are available, invokes scikit-learn regression
        to suggest optimal alternative time slots.
@@ -252,6 +252,37 @@ def search_rooms(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="End time must be after start time.",
+        )
+
+    if capacity > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Number of people cannot exceed the maximum limit of 100.",
+        )
+
+    if capacity < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Capacity must be at least 1 person.",
+        )
+
+    # Campus Operating Hours: 5:00 AM to 9:00 PM (21:00) on the same day
+    if start_utc.date() != end_utc.date():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rooms can only be requested between 5:00 AM and 9:00 PM on the same day.",
+        )
+
+    if start_utc.hour < 5 or start_utc.hour >= 21:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rooms can only be requested between 5:00 AM and 9:00 PM.",
+        )
+
+    if end_utc.hour < 5 or end_utc.hour > 21 or (end_utc.hour == 21 and end_utc.minute > 0):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rooms can only be requested between 5:00 AM and 9:00 PM.",
         )
 
     # Statuses that lock a room
@@ -631,6 +662,7 @@ def get_allotted_history(
         ReservationStatus.BOOKED,
         ReservationStatus.SCANNED,
         ReservationStatus.EXPIRED,
+        ReservationStatus.DENIED,
     ]
 
     reservations = (
@@ -712,13 +744,13 @@ def admin_make_decision(
             detail="Reservation not found",
         )
 
-    if reservation.status != ReservationStatus.PENDING_PERMISSION:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot decide on reservation already in '{reservation.status.value}' state",
-        )
-
     if payload.action == "approve":
+        if reservation.status != ReservationStatus.PENDING_PERMISSION:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot approve reservation already in '{reservation.status.value}' state",
+            )
+
         # Conflict check against any existing Booked or Scanned reservation
         conflicting = (
             db.query(Reservation)
@@ -731,7 +763,6 @@ def admin_make_decision(
             )
             .first()
         )
-
         if conflicting:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -745,7 +776,23 @@ def admin_make_decision(
         if student:
             student.total_bookings += 1
 
-    elif payload.action == "deny":
+    elif payload.action in ("deny", "cancel"):
+        if reservation.status not in (
+            ReservationStatus.PENDING_PERMISSION,
+            ReservationStatus.BOOKED,
+            ReservationStatus.SCANNED,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot cancel reservation in '{reservation.status.value}' state",
+            )
+
+        # If cancelling an already approved or checked-in reservation, decrement student total_bookings
+        if reservation.status in (ReservationStatus.BOOKED, ReservationStatus.SCANNED):
+            student = db.query(User).filter(User.id == reservation.user_id).first()
+            if student and student.total_bookings > 0:
+                student.total_bookings -= 1
+
         reservation.status = ReservationStatus.DENIED
 
     db.commit()
@@ -840,6 +887,24 @@ def admin_deny_request(
     return admin_make_decision(
         reservation_id=reservation_id,
         payload=AdminDecisionRequest(action="deny"),
+        admin=admin,
+        db=db,
+    )
+
+
+@app.post("/api/admin/reservations/{reservation_id}/cancel", response_model=ReservationResponse, tags=["Admin Portal"])
+def admin_cancel_reservation(
+    reservation_id: uuid.UUID,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Dedicated endpoint for Admin to cancel/revoke an active or pending reservation.
+    Decrements student's total_bookings if already approved/scanned and releases room.
+    """
+    return admin_make_decision(
+        reservation_id=reservation_id,
+        payload=AdminDecisionRequest(action="cancel"),
         admin=admin,
         db=db,
     )

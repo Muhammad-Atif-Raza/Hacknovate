@@ -65,7 +65,7 @@ def seed_database(db: Session, force_reset: bool = False):
         },
         {
             "name": "University Grand Auditorium",
-            "capacity": 150,
+            "capacity": 100,
             "acoustic_profile": AcousticProfile.AMPLIFIED,
         },
     ]
@@ -129,6 +129,7 @@ def seed_database(db: Session, force_reset: bool = False):
     # 3. Sample Reservations (Pending & Booked with Accompanying Students)
     # -------------------------------------------------------------
     now = datetime.utcnow()
+    res_date = (now + timedelta(days=1)).date()
 
     res1_accompanying = [
         {
@@ -165,8 +166,8 @@ def seed_database(db: Session, force_reset: bool = False):
         purpose="AI Hackathon Platform Group Brainstorming",
         accompanying_count=len(res1_accompanying),
         accompanying_students=res1_accompanying,
-        start_time=now + timedelta(hours=2),
-        end_time=now + timedelta(hours=4),
+        start_time=datetime.combine(res_date, datetime.min.time()).replace(hour=10, minute=0),
+        end_time=datetime.combine(res_date, datetime.min.time()).replace(hour=12, minute=0),
         status=ReservationStatus.PENDING_PERMISSION,
         created_at=now - timedelta(hours=1),
     )
@@ -200,8 +201,8 @@ def seed_database(db: Session, force_reset: bool = False):
         purpose="Robotics & Embedded Systems Design Sprint",
         accompanying_count=len(res2_accompanying),
         accompanying_students=res2_accompanying,
-        start_time=now + timedelta(days=1, hours=3),
-        end_time=now + timedelta(days=1, hours=5),
+        start_time=datetime.combine(res_date, datetime.min.time()).replace(hour=13, minute=0),
+        end_time=datetime.combine(res_date, datetime.min.time()).replace(hour=15, minute=0),
         status=ReservationStatus.PENDING_PERMISSION,
         created_at=now - timedelta(minutes=30),
     )

@@ -120,10 +120,11 @@ def run_all_tests():
     # -------------------------------------------------------------
     print_test_header("4. Room Search & ML Fallback")
     now = datetime.utcnow()
+    test_day = (now + timedelta(days=5)).replace(hour=10, minute=0, second=0, microsecond=0)
 
-    # Search where space is available
-    search_start = (now + timedelta(days=5)).isoformat() + "Z"
-    search_end = (now + timedelta(days=5, hours=2)).isoformat() + "Z"
+    # Search where space is available (10:00 AM - 12:00 PM)
+    search_start = test_day.isoformat() + "Z"
+    search_end = (test_day + timedelta(hours=2)).isoformat() + "Z"
 
     resp = client.get(
         "/api/rooms/search",
@@ -142,7 +143,7 @@ def run_all_tests():
     # Saturated search: Book all matching spaces for a window, then test ML Fallback
     db = SessionLocal()
     collab_spaces = db.query(Space).filter(Space.acoustic_profile == AcousticProfile.COLLABORATIVE).all()
-    crowded_start = now + timedelta(days=2, hours=10)
+    crowded_start = (now + timedelta(days=2)).replace(hour=14, minute=0, second=0, microsecond=0)
     crowded_end = crowded_start + timedelta(hours=2)
 
     # Block all collaborative spaces during this window
@@ -187,8 +188,9 @@ def run_all_tests():
     # -------------------------------------------------------------
     print_test_header("5. Booking Creation & Conflict Check")
     free_space = spaces[0]
-    b_start = (now + timedelta(days=3, hours=1)).isoformat() + "Z"
-    b_end = (now + timedelta(days=3, hours=3)).isoformat() + "Z"
+    b_date = (now + timedelta(days=3)).replace(hour=11, minute=0, second=0, microsecond=0)
+    b_start = b_date.isoformat() + "Z"
+    b_end = (b_date + timedelta(hours=2)).isoformat() + "Z"
 
     # Create new booking
     resp = client.post(
@@ -229,8 +231,8 @@ def run_all_tests():
         headers=student_headers,
         json={
             "space_id": free_space["id"],
-            "start_time": (now + timedelta(days=4)).isoformat() + "Z",
-            "end_time": (now + timedelta(days=4, hours=1)).isoformat() + "Z",
+            "start_time": (now + timedelta(days=4)).replace(hour=15, minute=0, second=0, microsecond=0).isoformat() + "Z",
+            "end_time": (now + timedelta(days=4)).replace(hour=16, minute=0, second=0, microsecond=0).isoformat() + "Z",
             "accompanying_count": free_space["capacity"] + 10,
             "purpose": "Oversized crowd",
         },
@@ -278,6 +280,35 @@ def run_all_tests():
     admin_prof = resp.json()
     print("[OK] Admin Profile retrieved:", admin_prof["name"])
     print(f"  Total Requests Processed: {admin_prof['total_requests_processed']}")
+
+    # Test Admin Cancellation of an approved reservation
+    resp = client.post(f"/api/admin/reservations/{new_booking_id}/cancel", headers=admin_headers)
+    assert resp.status_code == 200, f"Cancel failed: {resp.text}"
+    cancelled_res = resp.json()
+    assert cancelled_res["status"] == "Denied"
+    print("[OK] Admin successfully cancelled approved reservation. Status:", cancelled_res["status"])
+
+    # Test Operating Hours Rejection (3:00 AM search)
+    night_start = (now + timedelta(days=5)).replace(hour=3, minute=0, second=0, microsecond=0).isoformat() + "Z"
+    night_end = (now + timedelta(days=5)).replace(hour=4, minute=0, second=0, microsecond=0).isoformat() + "Z"
+    resp = client.get(
+        "/api/rooms/search",
+        params={"capacity": 5, "start_time": night_start, "end_time": night_end},
+    )
+    assert resp.status_code == 400
+    assert "5:00 AM and 9:00 PM" in resp.json()["detail"]
+    print("[OK] Operating Hours Enforcement: Nighttime search (3:00 AM) rejected with 400.")
+
+    # Test Capacity > 100 Rejection
+    day_start = (now + timedelta(days=5)).replace(hour=10, minute=0, second=0, microsecond=0).isoformat() + "Z"
+    day_end = (now + timedelta(days=5)).replace(hour=11, minute=0, second=0, microsecond=0).isoformat() + "Z"
+    resp = client.get(
+        "/api/rooms/search",
+        params={"capacity": 150, "start_time": day_start, "end_time": day_end},
+    )
+    assert resp.status_code == 400
+    assert "100" in resp.json()["detail"]
+    print("[OK] Capacity Limit Enforcement: Capacity 150 (>100) rejected with 400.")
 
     # -------------------------------------------------------------
     # 7. QR Check-In Verification

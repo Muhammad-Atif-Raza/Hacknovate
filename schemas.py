@@ -31,7 +31,7 @@ class UserResponse(UserBase):
 # ==========================================
 class SpaceBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
-    capacity: int = Field(..., gt=0, description="Capacity must be strictly greater than 0")
+    capacity: int = Field(..., gt=0, le=100, description="Capacity must be between 1 and 100")
     acoustic_profile: AcousticProfile
 
 
@@ -49,12 +49,22 @@ class SpaceResponse(SpaceBase):
 # Accompanying Student Schema
 # ==========================================
 class AccompanyingStudent(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100, description="Full Name")
+    name: Optional[str] = Field(None, max_length=100, description="Full Name")
+    full_name: Optional[str] = Field(None, max_length=100, description="Full Name")
     email: str = Field(..., min_length=3, max_length=255, description="College / Personal Email")
     enrollment_number: str = Field(..., min_length=2, max_length=50, description="Enrollment / Roll Number")
     phone_number: str = Field(..., min_length=10, max_length=15, description="10-digit Phone Number")
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def resolve_names(self) -> "AccompanyingStudent":
+        resolved = (self.name or self.full_name or "").strip()
+        if not resolved:
+            raise ValueError("Full Name is required for all accompanying students.")
+        self.name = resolved
+        self.full_name = resolved
+        return self
 
 
 # ==========================================
@@ -64,7 +74,7 @@ class ReservationCreate(BaseModel):
     space_id: uuid.UUID
     start_time: datetime
     end_time: datetime
-    accompanying_count: int = Field(default=0, ge=0)
+    accompanying_count: int = Field(default=0, ge=0, le=99)
     accompanying_students: List[AccompanyingStudent] = Field(default_factory=list)
     purpose: str = Field(..., min_length=3, max_length=500)
 
@@ -84,6 +94,21 @@ class ReservationCreate(BaseModel):
 
         if et <= st:
             raise ValueError("End time must be after start time.")
+
+        if st.date() != et.date():
+            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM on the same day.")
+
+        # Operating hours: 5:00 AM to 9:00 PM (21:00)
+        if st.hour < 5 or st.hour >= 21:
+            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
+
+        if et.hour < 5 or et.hour > 21 or (et.hour == 21 and et.minute > 0):
+            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
+
+        # Cap maximum capacity at 100 people
+        total_party = 1 + (len(self.accompanying_students) if self.accompanying_students else self.accompanying_count)
+        if total_party > 100:
+            raise ValueError("Number of people cannot exceed the maximum limit of 100.")
 
         # Ensure accompanying_count is kept in sync if students list provided
         if self.accompanying_students and len(self.accompanying_students) > 0:
@@ -132,6 +157,16 @@ class StandbyJoinRequest(BaseModel):
 
         if et <= st:
             raise ValueError("requested_end must be strictly after requested_start")
+
+        if st.date() != et.date():
+            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM on the same day.")
+
+        if st.hour < 5 or st.hour >= 21:
+            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
+
+        if et.hour < 5 or et.hour > 21 or (et.hour == 21 and et.minute > 0):
+            raise ValueError("Rooms can only be requested between 5:00 AM and 9:00 PM.")
+
         return self
 
 
@@ -195,7 +230,7 @@ class UserDashboardResponse(BaseModel):
 
 
 class AdminDecisionRequest(BaseModel):
-    action: Literal["approve", "deny"]
+    action: Literal["approve", "deny", "cancel"]
 
 
 class AdminHistoryItemResponse(BaseModel):
