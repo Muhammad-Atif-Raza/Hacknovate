@@ -5,6 +5,11 @@ from pydantic import BaseModel, Field, ConfigDict, model_validator
 from models import UserRole, AcousticProfile, ReservationStatus
 
 
+def get_ist_now() -> datetime:
+    """Returns current Indian Standard Time (UTC+5:30)."""
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+
+
 # ==========================================
 # User Schemas
 # ==========================================
@@ -82,16 +87,16 @@ class ReservationCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_time_window(self) -> "ReservationCreate":
-        # Check start_time not in the past (allow 2-minute buffer for clock drift)
-        now_utc = datetime.utcnow()
+        # Check start_time not in the past (allow 15-minute buffer for clock drift)
+        now_ist = get_ist_now()
         st = self.start_time
         if st.tzinfo is not None:
-            st = st.astimezone(timezone.utc).replace(tzinfo=None)
+            st = (st.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
         et = self.end_time
         if et.tzinfo is not None:
-            et = et.astimezone(timezone.utc).replace(tzinfo=None)
+            et = (et.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
 
-        if st < now_utc - timedelta(minutes=2):
+        if st < now_ist - timedelta(minutes=15):
             raise ValueError("Start time cannot be in the past. Please select a future date and time.")
 
         if et <= st:
@@ -151,15 +156,15 @@ class StandbyJoinRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_standby_window(self) -> "StandbyJoinRequest":
-        now_utc = datetime.utcnow()
+        now_ist = get_ist_now()
         st = self.requested_start
         if st.tzinfo is not None:
-            st = st.astimezone(timezone.utc).replace(tzinfo=None)
+            st = (st.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
         et = self.requested_end
         if et.tzinfo is not None:
-            et = et.astimezone(timezone.utc).replace(tzinfo=None)
+            et = (et.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
 
-        if st < now_utc - timedelta(minutes=2):
+        if st < now_ist - timedelta(minutes=15):
             raise ValueError("Requested start time cannot be in the past.")
 
         if et <= st:

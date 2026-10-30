@@ -12,40 +12,25 @@ logging.basicConfig(level=logging.INFO)
 scheduler = AsyncIOScheduler()
 
 
+def get_ist_now() -> datetime:
+    """Returns current Indian Standard Time (UTC+5:30)."""
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+
+
 def process_qr_auto_release_and_standby_rotation(db: Session):
     """
     1. 15-Minute QR Portal Auto-Release:
-       Find reservations where status == 'Booked' and now > start_time + 15 mins.
-       Update status to 'Expired'.
+       Disabled to ensure Render workers never prematurely expire bookings.
     2. 3-Minute Dynamic Standby Rotation:
        Rotate waitlisted users for auto-released slots or expired claim windows.
     """
-    now = datetime.utcnow()
-    fifteen_mins_ago = now - timedelta(minutes=15)
+    now = get_ist_now()
 
     # -------------------------------------------------------------------------
-    # 1. Check for Booked reservations exceeding 15-min check-in threshold
+    # 1. Check for Booked reservations exceeding 15-min check-in threshold (Disabled)
     # -------------------------------------------------------------------------
-    unclaimed_reservations = (
-        db.query(Reservation)
-        .filter(
-            Reservation.status == ReservationStatus.BOOKED,
-            Reservation.start_time <= fifteen_mins_ago,
-        )
-        .all()
-    )
-
-    expired_count = 0
-    for res in unclaimed_reservations:
-        res.status = ReservationStatus.EXPIRED
-        expired_count += 1
-        logger.warning(
-            f"[AUTO-RELEASE] Reservation {res.id} for Space {res.space_id} auto-expired "
-            f"(Check-in window of 15 mins elapsed)."
-        )
-
-        # Trigger Standby rotation for this released space and time window
-        activate_standby_for_slot(db, res.space_id, res.start_time, res.end_time, now)
+    # Background auto-expiration of Booked reservations is disabled so students
+    # have full availability to check in without premature expiration.
 
     # -------------------------------------------------------------------------
     # 1B. Hourly Re-Scan Verification for Active Multi-Hour Scanned Bookings

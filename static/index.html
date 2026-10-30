@@ -2532,7 +2532,8 @@
       // 2. Active Booking Card (Door QR Scanning only - No QR on student screen)
       const activeContainer = document.getElementById('active-booking-container');
       const bookedReservation = (data.active_bookings || []).find(b => b.status === 'Booked') ||
-                                (data.active_bookings || []).find(b => b.status === 'Scanned' && (new Date(b.end_time) - new Date(b.start_time)) / 3600000 > 1);
+                                (data.active_bookings || []).find(b => b.status === 'Scanned');
+      const pendingReservation = (data.active_bookings || []).find(b => b.status === 'Pending_Permission');
 
       if (bookedReservation) {
         const roomTitle = getRoomName(bookedReservation);
@@ -2563,6 +2564,7 @@
           <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
             <div class="checkin-info" style="flex: 1; min-width: 260px;">
               <span class="pill-tag ${isScanned ? 'tag-emerald' : 'tag-amber'}" style="margin-bottom: 0.65rem;">${actionBadge}</span>
+              ${bookedReservation.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
               <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
               <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
                 🕒 <strong>Slot:</strong> ${formatDateTime(bookedReservation.start_time)} - ${formatDateTime(bookedReservation.end_time)}
@@ -2589,9 +2591,29 @@
                   ${isScanned ? 'Physical presence verified' : 'Scan physical door plaque to confirm'}
                 </div>
               </div>
-              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="openCameraScanner('${bookedReservation.id}', '${bookedReservation.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
+              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="openCameraScanner('${bookedReservation.id}', '${bookedReservation.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
                 ${actionBtnLabel}
               </button>
+            </div>
+          </div>
+        `;
+      } else if (pendingReservation) {
+        const roomTitle = getRoomName(pendingReservation);
+        activeContainer.innerHTML = `
+          <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; border-left: 4px solid #f59e0b;">
+            <div class="checkin-info" style="flex: 1; min-width: 260px;">
+              <span class="pill-tag tag-amber" style="margin-bottom: 0.65rem;">⏳ Awaiting Faculty Approval</span>
+              <span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT OVERRIDE</span>
+              <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
+              <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
+                🕒 <strong>Requested Slot:</strong> ${formatDateTime(pendingReservation.start_time)} - ${formatDateTime(pendingReservation.end_time)}
+              </p>
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
+                🎯 <strong>Purpose:</strong> ${pendingReservation.purpose}
+              </p>
+              <p style="color: #92400e; font-size: 0.85rem; background: rgba(245, 158, 11, 0.1); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #fde68a;">
+                ℹ️ This urgent override request is currently under review by Faculty and Administrators. Physical Door QR check-in will be enabled automatically as soon as approval is granted.
+              </p>
             </div>
           </div>
         `;
@@ -2616,19 +2638,38 @@
       } else {
         data.active_bookings.forEach(res => {
           let statusTag = 'tag-amber';
-          if (res.status === 'Booked') statusTag = 'tag-blue';
-          if (res.status === 'Scanned') statusTag = 'tag-emerald';
+          let statusLabel = res.status.replace('_', ' ');
+          if (res.status === 'Booked') {
+            statusTag = 'tag-blue';
+            statusLabel = 'Booked';
+          } else if (res.status === 'Scanned') {
+            statusTag = 'tag-emerald';
+            statusLabel = 'Checked In (Scanned)';
+          } else if (res.status === 'Pending_Permission') {
+            statusTag = 'tag-amber';
+            statusLabel = '⏳ Awaiting Faculty Approval';
+          }
 
+          const roomTitle = getRoomName(res);
           const card = document.createElement('div');
           card.className = 'history-card';
           card.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
               <div>
-                <span class="pill-tag ${statusTag}">${res.status.replace('_', ' ')}</span>
+                <span class="pill-tag ${statusTag}">${statusLabel}</span>
                 ${res.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
-                <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${getRoomName(res)}</h4>
+                <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${roomTitle}</h4>
               </div>
-              <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.created_at)}</span>
+              <div style="text-align: right;">
+                <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.created_at)}</span>
+                ${res.status === 'Booked' ? `
+                  <div style="margin-top: 0.4rem;">
+                    <button class="btn-pill-dark" style="padding: 0.45rem 0.9rem; font-size: 0.82rem;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                      📷 Open Camera to Scan Door QR
+                    </button>
+                  </div>
+                ` : ''}
+              </div>
             </div>
             <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
               🕒 ${formatDateTime(res.start_time)} - ${formatDateTime(res.end_time)} &bull; Purpose: ${res.purpose}

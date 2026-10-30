@@ -57,11 +57,20 @@ logging.basicConfig(
 logger = logging.getLogger("campus_api")
 
 
+def get_ist_now() -> datetime:
+    """Returns current Indian Standard Time (UTC+5:30)."""
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+
+
 def to_naive_utc(dt: datetime) -> datetime:
-    """Normalizes any datetime to naive UTC for consistent database comparisons."""
+    """Normalizes any datetime to naive IST (UTC+5:30) for consistent database comparisons."""
+    if dt is None:
+        return None
     if dt.tzinfo is not None:
-        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return (dt.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
     return dt
+
+to_naive_ist = to_naive_utc
 
 
 # =====================================================================
@@ -186,8 +195,7 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
     along with occupant and upcoming scheduled booking.
     """
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    now_utc = datetime.utcnow()
-    now_local = datetime.now()
+    now = get_ist_now()
     spaces = db.query(Space).order_by(Space.name.asc()).all()
 
     active_statuses = [ReservationStatus.BOOKED, ReservationStatus.SCANNED]
@@ -200,10 +208,8 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
             .filter(
                 Reservation.space_id == s.id,
                 Reservation.status.in_(active_statuses),
-                or_(
-                    and_(Reservation.start_time <= now_utc + timedelta(minutes=15), Reservation.end_time > now_utc),
-                    and_(Reservation.start_time <= now_local + timedelta(minutes=15), Reservation.end_time > now_local),
-                ),
+                Reservation.start_time <= now + timedelta(minutes=15),
+                Reservation.end_time > now,
             )
             .order_by(Reservation.start_time.asc())
             .first()
@@ -215,10 +221,7 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
             .filter(
                 Reservation.space_id == s.id,
                 Reservation.status.in_(active_statuses),
-                or_(
-                    Reservation.start_time > now_utc + timedelta(minutes=15),
-                    Reservation.start_time > now_local + timedelta(minutes=15),
-                ),
+                Reservation.start_time > now + timedelta(minutes=15),
             )
             .order_by(Reservation.start_time.asc())
             .first()
@@ -290,7 +293,7 @@ def get_user_dashboard(
     Returns user profile (name, email, photo_url, total_bookings),
     active bookings, past history grouped by status, and active standby waitlists.
     """
-    now = datetime.utcnow()
+    now = get_ist_now()
 
     # Fetch user's reservations with space relations
     reservations = (
@@ -301,10 +304,15 @@ def get_user_dashboard(
         .all()
     )
 
-    # Active bookings: Booked or Pending_Permission with end_time in future
+    # Active bookings: ALL of user's Booked, Pending_Permission, and Scanned reservations
+    active_statuses = [
+        ReservationStatus.BOOKED,
+        ReservationStatus.PENDING_PERMISSION,
+        ReservationStatus.SCANNED,
+    ]
     active_bookings = [
         res for res in reservations
-        if res.end_time >= now and res.status in [ReservationStatus.BOOKED, ReservationStatus.PENDING_PERMISSION]
+        if res.status in active_statuses
     ]
 
     # Group full history by status
@@ -359,7 +367,7 @@ def search_rooms(
     start_utc = to_naive_utc(start_time)
     end_utc = to_naive_utc(end_time)
 
-    now_utc = datetime.utcnow()
+    now_utc = get_ist_now()
     if start_utc < now_utc - timedelta(minutes=2):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -496,8 +504,8 @@ def create_booking(
     start_utc = to_naive_utc(payload.start_time)
     end_utc = to_naive_utc(payload.end_time)
 
-    now_utc = datetime.utcnow()
-    if start_utc < now_utc - timedelta(minutes=2):
+    now = get_ist_now()
+    if start_utc < now - timedelta(minutes=15):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Start time cannot be in the past. Please select a future date and time.",
@@ -557,26 +565,18 @@ def create_booking(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Room is already physically checked into (Scanned) and cannot be overridden.",
                 )
-            # Allow urgent override request to be routed to Faculty/Admin Pending queue
+            # Route urgent override request to Faculty/Admin Pending queue
             current_user.urgent_requests_used += 1
             booking_status = ReservationStatus.PENDING_PERMISSION
         else:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="This space is already reserved for the selected timeframe. You can join the standby waitlist!",
+                detail="This space is already reserved for the selected timeframe. An urgent override request is required.",
             )
     else:
-        if payload.is_urgent:
-            if current_user.urgent_requests_used >= 3:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Monthly urgent request quota (3/3) exhausted.",
-                )
-            current_user.urgent_requests_used += 1
-            booking_status = ReservationStatus.PENDING_PERMISSION
-        else:
-            booking_status = ReservationStatus.BOOKED
-            current_user.total_bookings += 1
+        # NO CONFLICT: Empty room ALWAYS auto-approves to BOOKED immediately!
+        booking_status = ReservationStatus.BOOKED
+        current_user.total_bookings += 1
 
     reservation = Reservation(
         id=uuid.uuid4(),
@@ -589,7 +589,7 @@ def create_booking(
         end_time=end_utc,
         status=booking_status,
         is_urgent=payload.is_urgent,
-        created_at=datetime.utcnow(),
+        created_at=now,
     )
     db.add(reservation)
     db.commit()
@@ -655,7 +655,7 @@ def scan_qr_checkin(
 
     # Validate status: if already scanned, update last_scanned_at
     if reservation.status == ReservationStatus.SCANNED:
-        reservation.last_scanned_at = datetime.now()
+        reservation.last_scanned_at = get_ist_now()
         db.commit()
         db.refresh(reservation)
         return QRScanResponse(
@@ -665,7 +665,7 @@ def scan_qr_checkin(
 
     # Immediately flip status to SCANNED
     reservation.status = ReservationStatus.SCANNED
-    reservation.last_scanned_at = datetime.now()
+    reservation.last_scanned_at = get_ist_now()
     db.commit()
     db.refresh(reservation)
 
@@ -718,7 +718,7 @@ def join_standby_waitlist(
         requested_end=end_utc,
         flash_claim_expires_at=None,
         is_active=True,
-        created_at=datetime.utcnow(),
+        created_at=get_ist_now(),
     )
     db.add(waitlist_entry)
     db.commit()
@@ -799,7 +799,7 @@ def flash_claim_room(
         start_time=waitlist_entry.requested_start,
         end_time=waitlist_entry.requested_end,
         status=ReservationStatus.BOOKED,
-        created_at=datetime.utcnow(),
+        created_at=get_ist_now(),
     )
     db.add(claimed_reservation)
 
@@ -1125,7 +1125,7 @@ def ai_parse_booking(
     available matching room, and IMMEDIATELY creates the Booked reservation!
     """
     text = payload.prompt.strip().lower()
-    now = datetime.now()
+    now = get_ist_now()
 
     # 1. Capacity Extraction
     import re
@@ -1258,7 +1258,7 @@ def ai_parse_booking(
             end_time=end_dt,
             status=ReservationStatus.BOOKED,
             is_urgent=False,
-            created_at=datetime.utcnow(),
+            created_at=get_ist_now(),
         )
         if user:
             user.total_bookings += 1
