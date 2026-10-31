@@ -94,20 +94,34 @@ def require_admin(
     return current_user
 
 
+def determine_role_from_email(email: str, dev_role: Optional[UserRole] = None) -> UserRole:
+    """
+    Determines user role strictly based on university email:
+    - Emails with '.fac@st.niituniversity.in' (or containing '.fac@') are assigned ADMIN role (Admin's panel).
+    - Emails with '@st.niituniversity.in' are assigned STUDENT role.
+    - Legacy/test emails (admin@campus.edu -> ADMIN, others fallback to dev_role/STUDENT).
+    """
+    email_lower = email.strip().lower()
+    if ".fac@" in email_lower or email_lower.endswith(".fac@st.niituniversity.in") or email_lower == "admin@campus.edu":
+        return UserRole.ADMIN
+    if email_lower.endswith("@st.niituniversity.in"):
+        return UserRole.STUDENT
+    return dev_role if dev_role else UserRole.STUDENT
+
+
 @auth_router.post("/google", response_model=AuthResponse)
 def authenticate_google(
     payload: GoogleAuthRequest,
     db: Session = Depends(get_db),
 ):
     """
-    Google OAuth login with Dev Bypass support for rapid hackathon testing.
-    If dev_bypass_email is supplied, skips Google network verification and upserts
-    the user with the specified dev_role.
+    Google OAuth login with strict email domain role routing:
+    - @st.niituniversity.in -> Student role (Student Portal)
+    - .fac@st.niituniversity.in -> Admin role (Admin's Panel)
     """
     email: Optional[str] = None
     name: Optional[str] = None
     photo_url: Optional[str] = None
-    role: UserRole = payload.dev_role
 
     # Dev Bypass Path (Hackathon friendly)
     if payload.dev_bypass_email:
@@ -151,8 +165,29 @@ def authenticate_google(
             detail="Unable to obtain valid email from authentication provider",
         )
 
+    # Determine role strictly from university email pattern:
+    # @st.niituniversity.in is for students, .fac@st.niituniversity.in is for admin panel
+    role: UserRole = determine_role_from_email(email, payload.dev_role)
+
     # Upsert User in database
     user = db.query(User).filter(User.email == email).first()
+
+    # Migration alias for Agrim Goel:
+    if not user and email == "agrim.goel26@st.niituniversity.in":
+        user = db.query(User).filter(User.email == "agrimgoel14@gmail.com").first()
+        if user:
+            user.email = "agrim.goel26@st.niituniversity.in"
+            db.commit()
+            db.refresh(user)
+
+    # Migration alias for Sarah Connor:
+    if not user and email == "sarah.connor.fac@st.niituniversity.in":
+        user = db.query(User).filter(User.email == "admin@campus.edu").first()
+        if user:
+            user.email = "sarah.connor.fac@st.niituniversity.in"
+            db.commit()
+            db.refresh(user)
+
     if not user:
         # Determine ID format: Roll number or readable ID
         prefix = "ADM" if role == UserRole.ADMIN else "STU"
@@ -175,8 +210,7 @@ def authenticate_google(
             user.name = name
         if photo_url:
             user.photo_url = photo_url
-        if payload.dev_bypass_email and payload.dev_role:
-            user.role = payload.dev_role
+        user.role = role
         db.commit()
         db.refresh(user)
 

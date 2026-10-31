@@ -89,7 +89,7 @@ def seed_database(db: Session, force_reset: bool = False):
     # -------------------------------------------------------------
     admin_user = User(
         id="ADM-001",
-        email="admin@campus.edu",
+        email="sarah.connor.fac@st.niituniversity.in",
         name="Dr. Sarah Connor (Faculty Admin)",
         photo_url="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150",
         role=UserRole.ADMIN,
@@ -98,12 +98,30 @@ def seed_database(db: Session, force_reset: bool = False):
 
     user_agrim = User(
         id="STU-2026-001",
-        email="agrimgoel14@gmail.com",
+        email="agrim.goel26@st.niituniversity.in",
         name="Agrim Goel",
-        photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=agrimgoel14@gmail.com",
+        photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=agrim.goel26@st.niituniversity.in",
         role=UserRole.STUDENT,
         total_bookings=4,
         urgent_requests_used=1,
+    )
+
+    legacy_admin = User(
+        id="ADM-002",
+        email="admin@campus.edu",
+        name="Campus Admin",
+        photo_url="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150",
+        role=UserRole.ADMIN,
+        total_bookings=0,
+    )
+
+    legacy_agrim = User(
+        id="STU-2026-004",
+        email="agrimgoel14@gmail.com",
+        name="Agrim Goel (Legacy)",
+        photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=agrimgoel14@gmail.com",
+        role=UserRole.STUDENT,
+        total_bookings=0,
     )
 
     student_alex = User(
@@ -124,7 +142,7 @@ def seed_database(db: Session, force_reset: bool = False):
         total_bookings=5,
     )
 
-    db.add_all([admin_user, user_agrim, student_alex, student_priya])
+    db.add_all([admin_user, user_agrim, student_alex, student_priya, legacy_admin, legacy_agrim])
     db.flush()
 
     # -------------------------------------------------------------
