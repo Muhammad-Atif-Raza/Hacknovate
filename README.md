@@ -15,7 +15,7 @@ Production-ready, hackathon-grade backend built using **Python (FastAPI)**, **SQ
 
 ## 🚀 Features
 
-- **Multi-Role Authentication**: Google OAuth + Hackathon Dev Bypass (`dev_bypass_email`, `dev_role`) with signed JWT access tokens and dependency injection (`get_current_user`, `require_admin`).
+- **Multi-Role Authentication**: Google Identity Services ID-token sign-in, server-side Google token verification, university email-domain restrictions, and signed JWT access tokens.
 - **Conflict-Free Search**: Mathematical overlap detection (`start_time < requested_end AND end_time > requested_start`) across `'Pending_Permission'`, `'Booked'`, and `'Scanned'` reservations.
 - **ML Smart Slot Suggester**: Self-contained `scikit-learn` Ridge regression model evaluating campus occupancy ratios, peak hours, and room availability to calculate a congestion score and success probability when primary search yields 0 rooms.
 - **Dynamic 15-Minute QR Check-in & Auto-Release**: Background worker via `APScheduler` (interval: 60s) expiring unclaimed `'Booked'` reservations where `now > start_time + 15 mins`.
@@ -67,10 +67,8 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - Interactive Swagger UI: `http://localhost:8000/docs`
 - Interactive ReDoc: `http://localhost:8000/redoc`
 
-### 4. Run Test Suite
-```bash
-python test_backend.py
-```
+### 4. Authentication testing
+The legacy `test_backend.py` script uses the removed email-only development login and needs to be updated before it can run against this Google-token-only authentication flow. Test sign-in with a real university Google account after configuring `GOOGLE_CLIENT_ID`.
 
 ---
 
@@ -79,15 +77,19 @@ python test_backend.py
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./hackathon.db` | PostgreSQL connection string (`postgresql://...`) or SQLite fallback |
-| `JWT_SECRET` | `super-secret-campus-resource-key...` | HMAC secret for signing JWT access tokens |
+| `GOOGLE_CLIENT_ID` | *(required for Google sign-in)* | Google Cloud OAuth client ID for the Web application |
+| `JWT_SECRET` | *(required for authentication)* | Private, randomly generated HMAC secret for signing JWT access tokens |
 | `PORT` | `8000` | Port assigned by hosting provider (Render / Railway) |
+
+Set `GOOGLE_CLIENT_ID` and `JWT_SECRET` in the hosting provider's environment settings. Never commit either value to source control. The Google Client ID is public browser configuration; the JWT secret must remain private.
 
 ---
 
 ## 📡 API Reference Summary
 
 ### Authentication (`/api/auth`)
-- `POST /api/auth/google`: Authenticate via Google ID token or Hackathon Dev Bypass (`{"dev_bypass_email": "alex.chen@campus.edu", "dev_role": "student"}`).
+- `GET /api/auth/config`: Returns the public Google web client ID configured by the server.
+- `POST /api/auth/google`: Accepts a Google Identity Services ID token, verifies it against the configured client ID, and issues the app's JWT.
 - `POST /api/auth/logout`: Clears UI session.
 
 ### Student Portal (`/api/`)

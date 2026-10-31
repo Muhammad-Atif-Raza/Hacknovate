@@ -4,14 +4,15 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import jwt
-import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, UserRole
-from schemas import GoogleAuthRequest, AuthResponse, UserResponse, AuthConfigResponse, UpdateGoogleConfig
+from schemas import GoogleAuthRequest, AuthResponse, UserResponse, AuthConfigResponse
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ if os.path.exists(_env_file):
 
 
 # JWT Configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-campus-resource-key-hackathon-2026")
+JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
@@ -43,6 +44,8 @@ auth_router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Creates a signed JWT access token."""
+    if not JWT_SECRET:
+        raise RuntimeError("JWT_SECRET must be set in the server environment")
     to_encode = data.copy()
     now_utc = datetime.now(timezone.utc)
     if expires_delta:
@@ -57,6 +60,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def decode_access_token(token: str) -> dict:
     """Decodes and validates JWT token."""
     try:
+        if not JWT_SECRET:
+            raise jwt.InvalidTokenError("JWT_SECRET is not configured")
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
     except jwt.PyJWTError as e:
@@ -113,9 +118,10 @@ def require_admin(
 
 SUPER_ADMIN_EMAILS = {"tanmay.singh26@st.niituniversity.in"}
 ALLOWED_DOMAINS = ("@st.niituniversity.in", "@niituniversity.in")
+ALLOWED_HOSTED_DOMAINS = {"st.niituniversity.in", "niituniversity.in"}
 
 
-def determine_role_from_email(email: str, dev_role: Optional[UserRole] = None) -> UserRole:
+def determine_role_from_email(email: str) -> UserRole:
     """
     Determines user role strictly based on university email:
     - 'tanmay.singh26@st.niituniversity.in' is Super Admin.
@@ -123,7 +129,7 @@ def determine_role_from_email(email: str, dev_role: Optional[UserRole] = None) -
     - All other @st.niituniversity.in emails are student by default (can be granted admin from website).
     """
     email_lower = email.strip().lower()
-    if email_lower in SUPER_ADMIN_EMAILS or email_lower == "admin@campus.edu" or ".fac@" in email_lower:
+    if email_lower in SUPER_ADMIN_EMAILS or ".fac@" in email_lower:
         return UserRole.ADMIN
     return UserRole.STUDENT
 
@@ -138,105 +144,60 @@ def authenticate_google(
     - @st.niituniversity.in -> Student role (Student Portal)
     - .fac@st.niituniversity.in -> Admin role (Admin's Panel)
     """
-    email: Optional[str] = None
-    name: Optional[str] = None
-    photo_url: Optional[str] = None
-
-    # 1. Google OAuth via Access Token (OAuth2 UserInfo)
-    if payload.access_token:
-        try:
-            google_resp = requests.get(
-                "https://www.googleapis.com/oauth2/v3/userinfo",
-                headers={"Authorization": f"Bearer {payload.access_token}"},
-                timeout=6,
-            )
-            if google_resp.status_code == 200:
-                google_data = google_resp.json()
-                email = google_data.get("email", "").strip().lower()
-                name = google_data.get("name") or email.split("@")[0].title()
-                photo_url = google_data.get("picture")
-            else:
-                logger.warning(f"Google UserInfo API returned {google_resp.status_code}: {google_resp.text}")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired Google OAuth access token",
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Google access token verification error: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Google authentication service error: {e}",
-            )
-
-    # 2. Google OAuth via ID Token (JWT TokenInfo)
-    elif payload.id_token:
-        try:
-            google_resp = requests.get(
-                f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.id_token}",
-                timeout=6,
-            )
-            if google_resp.status_code == 200:
-                google_data = google_resp.json()
-                email = google_data.get("email", "").strip().lower()
-                name = google_data.get("name") or email.split("@")[0].title()
-                photo_url = google_data.get("picture")
-            else:
-                # In case Google API responds with error or offline testing, attempt unverified JWT claims decode
-                try:
-                    claims = jwt.decode(payload.id_token, options={"verify_signature": False})
-                    email = claims.get("email", "").strip().lower()
-                    name = claims.get("name") or (email.split("@")[0].title() if email else None)
-                    photo_url = claims.get("picture")
-                except Exception:
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Invalid Google OAuth ID token",
-                    )
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.warning(f"Token verification network warning: {e}. Checking unverified JWT claims.")
-            try:
-                claims = jwt.decode(payload.id_token, options={"verify_signature": False})
-                email = claims.get("email", "").strip().lower()
-                name = claims.get("name") or (email.split("@")[0].title() if email else None)
-                photo_url = claims.get("picture")
-            except Exception:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Google token verification failed: {e}",
-                )
-
-    # 3. Development / Sandbox Bypass Path
-    elif payload.dev_bypass_email:
-        email = payload.dev_bypass_email.strip().lower()
-        name = payload.name or email.split("@")[0].replace(".", " ").title()
-        photo_url = (
-            payload.photo_url
-            or f"https://api.dicebear.com/7.x/bottts/svg?seed={email}"
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured on this server",
         )
-    else:
+    if not payload.id_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Either id_token, access_token, or dev_bypass_email must be provided",
+            detail="A Google ID token is required",
         )
 
-    if not email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to obtain valid email from authentication provider",
+    try:
+        google_data = google_id_token.verify_oauth2_token(
+            payload.id_token,
+            google_requests.Request(),
+            audience=client_id,
         )
+    except ValueError as exc:
+        logger.info("Rejected invalid Google ID token: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired Google ID token",
+        ) from exc
+    except Exception as exc:
+        logger.error("Google ID token verification service failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in verification is temporarily unavailable",
+        ) from exc
+
+    email = (google_data.get("email") or "").strip().lower()
+    if not email or google_data.get("email_verified") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google account must have a verified email address",
+        )
+    hosted_domain = (google_data.get("hd") or "").strip().lower()
+    if hosted_domain not in ALLOWED_HOSTED_DOMAINS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sign in with an account managed by NIIT University",
+        )
+    name = google_data.get("name") or email.split("@")[0].title()
+    photo_url = google_data.get("picture")
 
     email_lower = email.strip().lower()
-    if not any(email_lower.endswith(dom) for dom in ALLOWED_DOMAINS) and email_lower != "admin@campus.edu":
+    if not any(email_lower.endswith(dom) for dom in ALLOWED_DOMAINS):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access Restricted: Only @st.niituniversity.in accounts are permitted to sign in.",
         )
 
-    role: UserRole = determine_role_from_email(email_lower, payload.dev_role)
+    role: UserRole = determine_role_from_email(email_lower)
 
     # Upsert User in database
     user = db.query(User).filter(User.email == email).first()
@@ -319,24 +280,3 @@ def get_auth_config():
     )
 
 
-@auth_router.post("/config")
-def update_auth_config(payload: UpdateGoogleConfig):
-    """Dynamically updates or configures the Google OAuth Client ID."""
-    client_id = payload.google_client_id.strip()
-    os.environ["GOOGLE_CLIENT_ID"] = client_id
-
-    # Persist to local .env
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-    lines = []
-    if os.path.exists(env_path):
-        with open(env_path, "r", encoding="utf-8") as f:
-            lines = [l for l in f.readlines() if not l.startswith("GOOGLE_CLIENT_ID=")]
-    lines.append(f"GOOGLE_CLIENT_ID={client_id}\n")
-    with open(env_path, "w", encoding="utf-8") as f:
-        f.writelines(lines)
-
-    return {
-        "message": "Google Client ID updated successfully",
-        "google_client_id": client_id,
-        "has_client_id": bool(client_id),
-    }

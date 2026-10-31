@@ -1,4 +1,7 @@
 import os
+os.environ["GOOGLE_CLIENT_ID"] = "test-client-id.apps.googleusercontent.com"
+os.environ["JWT_SECRET"] = "test-super-secret-jwt-key-hacknovate-2026"
+from unittest.mock import patch
 import sys
 import uuid
 from datetime import datetime, timedelta
@@ -58,63 +61,74 @@ def run_all_tests():
     print(f"[OK] Found {len(spaces)} campus spaces across Silent, Collaborative, Amplified.")
 
     # -------------------------------------------------------------
-    # 2. Authentication Tests
+    # 2. Authentication Tests (Google OAuth ID Token Verification)
     # -------------------------------------------------------------
     print_test_header("2. Authentication & Role Permissions")
 
-    # Student Auth via Dev Bypass
-    resp = client.post(
-        "/api/auth/google",
-        json={
-            "dev_bypass_email": "alex.chen26@st.niituniversity.in",
-            "dev_role": "student",
+    # Student Auth via Google ID Token
+    with patch("google.oauth2.id_token.verify_oauth2_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "alex.chen26@st.niituniversity.in",
+            "email_verified": True,
+            "hd": "st.niituniversity.in",
             "name": "Alex Chen",
-        },
-    )
-    assert resp.status_code == 200, f"Student auth failed: {resp.text}"
-    student_auth = resp.json()
-    student_token = student_auth["access_token"]
-    student_headers = {"Authorization": f"Bearer {student_token}"}
-    print("[OK] Student authenticated:", student_auth["user"]["name"], f"(Role: {student_auth['role']})")
+            "picture": "https://api.dicebear.com/7.x/bottts/svg?seed=alex",
+        }
+        resp = client.post("/api/auth/google", json={"id_token": "valid-student-google-id-token"})
+        assert resp.status_code == 200, f"Student auth failed: {resp.text}"
+        student_auth = resp.json()
+        student_token = student_auth["access_token"]
+        student_headers = {"Authorization": f"Bearer {student_token}"}
+        print("[OK] Student authenticated:", student_auth["user"]["name"], f"(Role: {student_auth['role']})")
 
-    # Admin Auth via Dev Bypass
-    resp = client.post(
-        "/api/auth/google",
-        json={
-            "dev_bypass_email": "admin@campus.edu",
-            "dev_role": "admin",
+    # Faculty Admin Auth via Google ID Token
+    with patch("google.oauth2.id_token.verify_oauth2_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "sarah.connor.fac@st.niituniversity.in",
+            "email_verified": True,
+            "hd": "st.niituniversity.in",
             "name": "Dr. Sarah Connor",
-        },
-    )
-    assert resp.status_code == 200, f"Admin auth failed: {resp.text}"
-    admin_auth = resp.json()
-    admin_token = admin_auth["access_token"]
-    admin_headers = {"Authorization": f"Bearer {admin_token}"}
-    print("[OK] Admin authenticated:", admin_auth["user"]["name"], f"(Role: {admin_auth['role']})")
+            "picture": None,
+        }
+        resp = client.post("/api/auth/google", json={"id_token": "valid-admin-google-id-token"})
+        assert resp.status_code == 200, f"Admin auth failed: {resp.text}"
+        admin_auth = resp.json()
+        admin_token = admin_auth["access_token"]
+        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+        print("[OK] Admin authenticated:", admin_auth["user"]["name"], f"(Role: {admin_auth['role']})")
 
     # Auth Config endpoint test
     resp = client.get("/api/auth/config")
     assert resp.status_code == 200
     auth_cfg = resp.json()
     assert auth_cfg["hosted_domain"] == "st.niituniversity.in"
+    assert auth_cfg["has_client_id"] is True
     print("[OK] Auth Config endpoint returned:", auth_cfg)
 
     # Unauthorized Domain rejection test (403 Forbidden)
-    resp = client.post(
-        "/api/auth/google",
-        json={"dev_bypass_email": "outsider@gmail.com", "dev_role": "student"},
-    )
-    assert resp.status_code == 403, f"Expected 403 for outsider domain, got {resp.status_code}"
-    print("[OK] Non-university email successfully rejected with 403 Forbidden.")
+    with patch("google.oauth2.id_token.verify_oauth2_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "outsider@gmail.com",
+            "email_verified": True,
+            "hd": "gmail.com",
+            "name": "Outsider",
+        }
+        resp = client.post("/api/auth/google", json={"id_token": "outsider-token"})
+        assert resp.status_code == 403, f"Expected 403 for outsider domain, got {resp.status_code}"
+        print("[OK] Non-university email successfully rejected with 403 Forbidden.")
 
     # Super Admin check for Tanmay Singh
-    resp = client.post(
-        "/api/auth/google",
-        json={"dev_bypass_email": "tanmay.singh26@st.niituniversity.in", "name": "Tanmay Singh"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["role"] == "admin"
-    print("[OK] tanmay.singh26@st.niituniversity.in successfully authenticated with Super Admin role.")
+    with patch("google.oauth2.id_token.verify_oauth2_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "tanmay.singh26@st.niituniversity.in",
+            "email_verified": True,
+            "hd": "st.niituniversity.in",
+            "name": "Tanmay Singh",
+        }
+        resp = client.post("/api/auth/google", json={"id_token": "tanmay-token"})
+        assert resp.status_code == 200
+        assert resp.json()["role"] == "admin"
+        print("[OK] tanmay.singh26@st.niituniversity.in successfully authenticated with Super Admin role.")
 
     # Logout endpoint test
     resp = client.post("/api/auth/logout")
@@ -409,13 +423,18 @@ def run_all_tests():
     )
     db.add(unclaimed_res)
 
-    # Student 2 Auth via Dev Bypass to flash claim
-    resp = client.post(
-        "/api/auth/google",
-        json={"dev_bypass_email": "priya.sharma26@st.niituniversity.in", "dev_role": "student"},
-    )
-    student2_user_id = resp.json()["user"]["id"]
-    student2_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    # Student 2 Auth via Google ID Token to flash claim
+    with patch("google.oauth2.id_token.verify_oauth2_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "priya.sharma26@st.niituniversity.in",
+            "email_verified": True,
+            "hd": "st.niituniversity.in",
+            "name": "Priya Sharma",
+        }
+        resp = client.post("/api/auth/google", json={"id_token": "student2-google-id-token"})
+        assert resp.status_code == 200
+        student2_user_id = resp.json()["user"]["id"]
+        student2_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
     # Add student 2 to StandbyWaitlist for this space and slot
     waitlist_student = StandbyWaitlist(
