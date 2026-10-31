@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
+import pytz
 from sqlalchemy import (
     Column,
     String,
@@ -16,6 +17,13 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from database import Base
+
+IST = pytz.timezone('Asia/Kolkata')
+
+
+def get_ist_now() -> datetime:
+    """Returns current Indian Standard Time (Asia/Kolkata) as naive datetime."""
+    return datetime.now(IST).replace(tzinfo=None)
 
 
 class GUID(TypeDecorator):
@@ -120,7 +128,7 @@ class Reservation(Base):
     )
     is_urgent = Column(Boolean, default=False, nullable=False)
     last_scanned_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_ist_now, nullable=False)
 
     user = relationship("User", back_populates="reservations")
     space = relationship("Space", back_populates="reservations")
@@ -140,7 +148,7 @@ class StandbyWaitlist(Base):
     requested_end = Column(DateTime, nullable=False)
     flash_claim_expires_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_ist_now, nullable=False)
 
     user = relationship("User", back_populates="waitlists")
     space = relationship("Space", back_populates="waitlists")

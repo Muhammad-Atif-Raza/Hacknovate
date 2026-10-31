@@ -11,6 +11,7 @@ from models import (
     Reservation,
     ReservationStatus,
     StandbyWaitlist,
+    get_ist_now,
 )
 
 logger = logging.getLogger("seed_data")
@@ -129,7 +130,7 @@ def seed_database(db: Session, force_reset: bool = False):
     # -------------------------------------------------------------
     # 3. Sample Reservations (Pending & Booked with Accompanying Students)
     # -------------------------------------------------------------
-    now = datetime.utcnow()
+    now = get_ist_now()
     res_date = (now + timedelta(days=1)).date()
 
     res1_accompanying = [

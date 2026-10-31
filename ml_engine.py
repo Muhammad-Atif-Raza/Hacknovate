@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.linear_model import Ridge
 from sqlalchemy.orm import Session
 
-from models import Space, Reservation, ReservationStatus, AcousticProfile
+from models import Space, Reservation, ReservationStatus, AcousticProfile, get_ist_now
 from schemas import MLSuggestedSlotResponse, SpaceResponse
 
 logger = logging.getLogger(__name__)
@@ -126,7 +126,7 @@ def suggest_optimal_slots(
     ]
 
     candidate_slots = []
-    now = datetime.utcnow()
+    now = get_ist_now()
 
     active_statuses = [
         ReservationStatus.PENDING_PERMISSION,

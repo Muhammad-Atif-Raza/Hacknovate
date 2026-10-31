@@ -1164,9 +1164,7 @@
         <h3 class="section-title">📜 My Booking History</h3>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
           <button class="nav-tab-btn active" onclick="filterHistory('All')">All</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Scanned')">Scanned / Completed</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Booked')">Booked</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Pending_Permission')">Pending</button>
+          <button class="nav-tab-btn" onclick="filterHistory('Completed')">Completed</button>
           <button class="nav-tab-btn" onclick="filterHistory('Expired')">Expired / No-Show</button>
           <button class="nav-tab-btn" onclick="filterHistory('Denied')">Denied / Cancelled</button>
         </div>
@@ -1636,8 +1634,27 @@
 
     function formatDateTime(isoStr) {
       if (!isoStr) return '';
+      if (typeof isoStr === 'string') {
+        const cleanStr = isoStr.replace('Z', '').split('.')[0];
+        const match = cleanStr.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (match) {
+          const monthIdx = parseInt(match[2], 10) - 1;
+          const day = parseInt(match[3], 10);
+          const hour24 = parseInt(match[4], 10);
+          const minute = match[5];
+
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthStr = months[monthIdx] || match[2];
+
+          const hour12 = hour24 % 12 || 12;
+          const ampm = hour24 >= 12 ? 'PM' : 'AM';
+          const hourStr = String(hour12).padStart(2, '0');
+
+          return `${monthStr} ${day}, ${hourStr}:${minute} ${ampm}`;
+        }
+      }
       const d = new Date(isoStr);
-      return d.toLocaleDateString('en-US', {
+      return isNaN(d.getTime()) ? isoStr : d.toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
       });
     }
@@ -2701,7 +2718,7 @@
             statusLabel = 'Booked';
           } else if (res.status === 'Scanned') {
             statusTag = 'tag-emerald';
-            statusLabel = '🟢 Checked In & Verified';
+            statusLabel = '🟢 Checked In';
             const endTime = new Date(res.end_time);
             const diffMs = endTime - now;
             if (diffMs > 0) {
@@ -2727,7 +2744,7 @@
                 <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${roomTitle}</h4>
               </div>
               <div style="text-align: right;">
-                <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.created_at)}</span>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.start_time)}</span>
                 ${res.status === 'Booked' ? `
                   <div style="margin-top: 0.4rem;">
                     <button class="btn-pill-dark" style="padding: 0.45rem 0.9rem; font-size: 0.82rem;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
@@ -3024,42 +3041,54 @@
       container.innerHTML = '';
 
       let items = [];
-      if (AppState.historyFilter === 'All') {
-        Object.keys(history).forEach(status => {
-          items = items.concat(history[status]);
-        });
+      if (Array.isArray(history)) {
+        if (AppState.historyFilter === 'All') {
+          items = history;
+        } else if (AppState.historyFilter === 'Completed') {
+          items = history.filter(item => item.status !== 'Expired' && item.status !== 'Denied');
+        } else {
+          items = history.filter(item => item.status === AppState.historyFilter);
+        }
       } else {
-        items = history[AppState.historyFilter] || [];
+        if (AppState.historyFilter === 'All') {
+          items = history['All'] || Object.values(history).flat();
+        } else {
+          items = history[AppState.historyFilter] || [];
+        }
       }
 
       if (items.length === 0) {
         container.innerHTML = `
           <div style="background: var(--surface); border: 1px dashed var(--border); border-radius: 16px; padding: 2.5rem; text-align: center; color: var(--text-secondary);">
-            No records found for status: <strong>${AppState.historyFilter}</strong>
+            No records found for filter: <strong>${AppState.historyFilter}</strong>
           </div>
         `;
         return;
       }
 
-      items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      // Sort by start_time descending
+      items.sort((a, b) => (b.start_time || '').localeCompare(a.start_time || ''));
 
       items.forEach(item => {
         let tagClass = 'tag-neutral';
-        if (item.status === 'Scanned') tagClass = 'tag-emerald';
-        if (item.status === 'Booked') tagClass = 'tag-blue';
-        if (item.status === 'Pending_Permission') tagClass = 'tag-amber';
-        if (item.status === 'Expired' || item.status === 'Denied') tagClass = 'tag-rose';
+        let statusLabel = item.status.replace('_', ' ');
+        if (item.status === 'Scanned' || item.status === 'Completed' || item.status === 'Booked') {
+          tagClass = 'tag-emerald';
+          statusLabel = 'Completed';
+        } else if (item.status === 'Expired' || item.status === 'Denied') {
+          tagClass = 'tag-rose';
+        }
 
         const card = document.createElement('div');
         card.className = 'history-card';
         card.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
             <div>
-              <span class="pill-tag ${tagClass}">${item.status.replace('_', ' ')}</span>
+              <span class="pill-tag ${tagClass}">${statusLabel}</span>
               ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
               <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${getRoomName(item)}</h4>
             </div>
-            <span style="font-size: 0.82rem; color: var(--text-muted);">${formatDateTime(item.created_at)}</span>
+            <span style="font-size: 0.82rem; color: var(--text-muted);">${formatDateTime(item.start_time)}</span>
           </div>
           <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
             🕒 ${formatDateTime(item.start_time)} - ${formatDateTime(item.end_time)} &bull; Purpose: ${item.purpose}

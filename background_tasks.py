@@ -23,52 +23,21 @@ def get_ist_now() -> datetime:
 def process_qr_auto_release_and_standby_rotation(db: Session):
     """
     1. 15-Minute QR Portal Auto-Release:
-       Disabled to ensure Render workers never prematurely expire bookings.
-    2. 3-Minute Dynamic Standby Rotation:
+       Only affects Booked reservations that were never scanned.
+       (Disabled to prevent premature cancellation on cloud deployments).
+    2. Scanned Reservations:
+       The scheduler NEVER changes a Scanned reservation before its end_time!
+    3. 3-Minute Dynamic Standby Rotation:
        Rotate waitlisted users for auto-released slots or expired claim windows.
     """
     now = get_ist_now()
+    expired_count = 0
 
     # -------------------------------------------------------------------------
-    # 1. Check for Booked reservations exceeding 15-min check-in threshold (Disabled)
+    # 1. Scanned Reservations: Active until end_time passes naturally
     # -------------------------------------------------------------------------
-    # Background auto-expiration of Booked reservations is disabled so students
-    # have full availability to check in without premature expiration.
-
-    # -------------------------------------------------------------------------
-    # 1B. Hourly Re-Scan Verification for Active Multi-Hour Scanned Bookings
-    # -------------------------------------------------------------------------
-    active_scanned = (
-        db.query(Reservation)
-        .filter(
-            Reservation.status == ReservationStatus.SCANNED,
-            Reservation.start_time <= now,
-            Reservation.end_time > now,
-        )
-        .all()
-    )
-
-    for res in active_scanned:
-        total_duration_hours = (res.end_time - res.start_time).total_seconds() / 3600.0
-        if total_duration_hours > 1.0:
-            hours_elapsed = int((now - res.start_time).total_seconds() // 3600)
-            if hours_elapsed >= 1:
-                # Target hourly mark for the current hour
-                hour_checkpoint = res.start_time + timedelta(hours=hours_elapsed)
-                grace_cutoff = hour_checkpoint + timedelta(minutes=15)
-                window_open = hour_checkpoint - timedelta(minutes=5)
-
-                if now > grace_cutoff:
-                    # Check if student refreshed scan in this window
-                    last_scan = getattr(res, "last_scanned_at", None)
-                    if last_scan is None or last_scan < window_open:
-                        res.status = ReservationStatus.EXPIRED
-                        expired_count += 1
-                        logger.warning(
-                            f"[HOURLY RE-SCAN AUTO-RELEASE] Multi-hour reservation {res.id} on space {res.space_id} "
-                            f"auto-expired due to missed hourly physical verification scan."
-                        )
-                        activate_standby_for_slot(db, res.space_id, now, res.end_time, now)
+    # Scanned reservations are never expired early by the scheduler.
+    # The active/history classification rule handles transitioning them to history once end_time <= now.
 
     # -------------------------------------------------------------------------
     # 2. Check for Expired 3-Minute Flash Claims on Standby Waitlist

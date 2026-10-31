@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from main import app
 from database import SessionLocal, Base, engine
 from models import (
+    get_ist_now,
     User,
     UserRole,
     Space,
@@ -119,7 +120,7 @@ def run_all_tests():
     # 4. Room Search & Conflict-Free Math + ML Fallback
     # -------------------------------------------------------------
     print_test_header("4. Room Search & ML Fallback")
-    now = datetime.utcnow()
+    now = get_ist_now()
     test_day = (now + timedelta(days=5)).replace(hour=10, minute=0, second=0, microsecond=0)
 
     # Search where space is available (10:00 AM - 12:00 PM)

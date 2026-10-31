@@ -79,6 +79,27 @@ def to_naive_utc(dt: datetime) -> datetime:
 to_naive_ist = to_naive_utc
 
 
+def classify_reservation(res: Reservation, now: Optional[datetime] = None) -> str:
+    """
+    Classification rule, applied in ONE place and reused by dashboard and history:
+    ACTIVE = status in (Booked, Pending_Permission, Scanned) AND end_time > get_ist_now()
+    HISTORY = status in (Cancelled, Denied, Expired) OR end_time <= get_ist_now()
+    A Scanned reservation must NEVER go to history because of its status alone.
+    """
+    if now is None:
+        now = get_ist_now()
+
+    active_statuses = {
+        ReservationStatus.BOOKED,
+        ReservationStatus.PENDING_PERMISSION,
+        ReservationStatus.SCANNED,
+    }
+
+    if res.status in active_statuses and res.end_time > now:
+        return "ACTIVE"
+    return "HISTORY"
+
+
 # =====================================================================
 # Lifespan Context Manager (Startup & Shutdown)
 # =====================================================================
@@ -172,7 +193,7 @@ def health_check():
     return {
         "status": "online",
         "service": "AI Campus Resource Management API",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": get_ist_now().isoformat(),
         "version": "2.0.0",
     }
 
@@ -301,24 +322,7 @@ def get_user_dashboard(
     """
     now = get_ist_now()
 
-    # Active reservations query: explicitly includes BOOKED, PENDING_PERMISSION, and SCANNED where end_time > get_ist_now()
-    active_res = (
-        db.query(Reservation)
-        .options(joinedload(Reservation.space))
-        .filter(
-            Reservation.user_id == current_user.id,
-            Reservation.status.in_([
-                ReservationStatus.BOOKED,
-                ReservationStatus.PENDING_PERMISSION,
-                ReservationStatus.SCANNED,
-            ]),
-            Reservation.end_time > now,
-        )
-        .order_by(Reservation.start_time.desc())
-        .all()
-    )
-
-    # Fetch user's reservations with space relations for full history grouping
+    # Fetch user's reservations with space relations
     reservations = (
         db.query(Reservation)
         .options(joinedload(Reservation.space))
@@ -327,24 +331,35 @@ def get_user_dashboard(
         .all()
     )
 
-    # Group full history by status
-    # Scanned reservations move to history only once the booking time slot has fully elapsed
-    grouped_history = {
-        ReservationStatus.PENDING_PERMISSION.value: [],
-        ReservationStatus.BOOKED.value: [],
-        ReservationStatus.SCANNED.value: [],
-        ReservationStatus.EXPIRED.value: [],
-        ReservationStatus.DENIED.value: [],
-    }
+    # Classification rule applied in ONE place and reused by dashboard and history:
+    # ACTIVE = status in (Booked, Pending_Permission, Scanned) AND end_time > get_ist_now()
+    # HISTORY = status in (Cancelled, Denied, Expired) OR end_time <= get_ist_now()
+    # A Scanned reservation must NEVER go to history because of its status alone.
+    active_reservations = []
+    history_reservations = []
 
-    active_ids = {r.id for r in active_res}
     for res in reservations:
-        status_key = res.status.value
-        # If Scanned and slot has not elapsed yet, it stays active on dashboard and does not move to history
-        if res.id in active_ids and res.status == ReservationStatus.SCANNED:
-            continue
-        if status_key in grouped_history:
-            grouped_history[status_key].append(ReservationResponse.model_validate(res))
+        if classify_reservation(res, now) == "ACTIVE":
+            active_reservations.append(res)
+        else:
+            history_reservations.append(res)
+
+    # Group history: Remove 'Scanned' from any history-by-status list!
+    grouped_history = {
+        "All": [ReservationResponse.model_validate(r) for r in history_reservations],
+        "Completed": [
+            ReservationResponse.model_validate(r) for r in history_reservations
+            if r.status not in [ReservationStatus.EXPIRED, ReservationStatus.DENIED]
+        ],
+        ReservationStatus.EXPIRED.value: [
+            ReservationResponse.model_validate(r) for r in history_reservations
+            if r.status == ReservationStatus.EXPIRED
+        ],
+        ReservationStatus.DENIED.value: [
+            ReservationResponse.model_validate(r) for r in history_reservations
+            if r.status == ReservationStatus.DENIED
+        ],
+    }
 
     # Fetch active standby waitlists
     waitlists = (
@@ -358,12 +373,14 @@ def get_user_dashboard(
         .all()
     )
 
-    validated_active = [ReservationResponse.model_validate(r) for r in active_res]
+    validated_active = [ReservationResponse.model_validate(r) for r in active_reservations]
+    validated_history = [ReservationResponse.model_validate(r) for r in history_reservations]
 
     return UserDashboardResponse(
         user=UserResponse.model_validate(current_user),
         active_bookings=validated_active,
         active_reservations=validated_active,
+        history=validated_history,
         history_by_status=grouped_history,
         standby_waitlists=[StandbyResponse.model_validate(w) for w in waitlists],
     )
@@ -781,7 +798,7 @@ def flash_claim_room(
             detail="This standby waitlist entry is no longer active",
         )
 
-    now = datetime.utcnow()
+    now = get_ist_now()
     if not waitlist_entry.flash_claim_expires_at or now > waitlist_entry.flash_claim_expires_at:
         waitlist_entry.is_active = False
         db.commit()

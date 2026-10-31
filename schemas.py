@@ -261,6 +261,7 @@ class UserDashboardResponse(BaseModel):
     user: UserResponse
     active_bookings: List[ReservationResponse]
     active_reservations: Optional[List[ReservationResponse]] = None
+    history: Optional[List[ReservationResponse]] = None
     history_by_status: Dict[str, List[ReservationResponse]]
     standby_waitlists: List[StandbyResponse]
 
