@@ -58,7 +58,9 @@ def run_all_tests():
     assert resp.status_code == 200
     spaces = resp.json()
     assert len(spaces) == 6
-    print(f"[OK] Found {len(spaces)} campus spaces across Silent, Collaborative, Amplified.")
+    assert "rfid_reader_id" in spaces[0]
+    assert spaces[0]["rfid_reader_id"].startswith("RFID-DOOR-")
+    print(f"[OK] Found {len(spaces)} campus spaces across Silent, Collaborative, Amplified with RFID reader pairing.")
 
     # -------------------------------------------------------------
     # 2. Authentication Tests (Google OAuth ID Token Verification)
@@ -498,6 +500,60 @@ def run_all_tests():
     assert claimed_res["status"] == "Booked"
 
     db.close()
+
+    # -------------------------------------------------------------
+    # 9. Dual-Factor Physical Presence (RFID Tap-In / Tap-Out)
+    # -------------------------------------------------------------
+    print_test_header("9. Dual-Factor Physical Presence (RFID Entry & Exit)")
+    db = SessionLocal()
+    rfid_space = spaces[4]
+    rfid_res = Reservation(
+        id=uuid.uuid4(),
+        user_id=student_auth["user"]["id"],
+        space_id=rfid_space["id"],
+        purpose="RFID Dual Factor Presence Test",
+        accompanying_count=0,
+        start_time=now - timedelta(minutes=5),
+        end_time=now + timedelta(minutes=55),
+        status=ReservationStatus.BOOKED,
+    )
+    db.add(rfid_res)
+    db.commit()
+    rfid_res_id = rfid_res.id
+    db.close()
+
+    # 1. Tap RFID Card to enter room
+    resp = client.post(f"/api/bookings/{rfid_res_id}/rfid-entry", headers=student_headers)
+    assert resp.status_code == 200, f"RFID entry failed: {resp.text}"
+    entry_data = resp.json()
+    assert entry_data["rfid_status"] == "INSIDE"
+    assert entry_data["door_status"] == "UNLOCKED"
+    assert entry_data["reservation"]["status"] == "Scanned"
+    print("[OK] RFID Card Entry Tap verified: Door unlocked, status Scanned, RFID Inside.")
+
+    # 2. Tap RFID Card for temporary step out (15m hold)
+    resp = client.post(f"/api/bookings/{rfid_res_id}/rfid-exit", json={"action": "temp_break"}, headers=student_headers)
+    assert resp.status_code == 200, f"RFID temp_break failed: {resp.text}"
+    break_data = resp.json()
+    assert break_data["rfid_status"] == "TEMP_OUT"
+    print("[OK] RFID Temporary Break logged: 15-minute hold active.")
+
+    # 3. Tap RFID Card for final checkout & immediate room release
+    resp = client.post(f"/api/bookings/{rfid_res_id}/rfid-exit", json={"action": "checkout"}, headers=student_headers)
+    assert resp.status_code == 200, f"RFID checkout failed: {resp.text}"
+    checkout_data = resp.json()
+    assert checkout_data["rfid_status"] == "CHECKED_OUT"
+    assert checkout_data["action"] == "checkout"
+    print("[OK] RFID Final Checkout verified: Room immediately released!")
+
+    # Verify Live Room Status shows this room is available now
+    resp = client.get("/api/rooms/live-status")
+    assert resp.status_code == 200
+    live_rooms = resp.json()
+    matched_room = next((r for r in live_rooms if r["id"] == str(rfid_space["id"])), None)
+    assert matched_room is not None
+    assert matched_room["is_occupied"] is False
+    print(f"[OK] Live Room Status verified: {matched_room['name']} is immediately Free/Available.")
 
     print_test_header("ALL TESTS PASSED WITH 100% SUCCESS!")
 

@@ -105,6 +105,7 @@ class Space(Base):
         SAEnum(AcousticProfile, name="acoustic_profile_enum", native_enum=False),
         nullable=False,
     )
+    rfid_reader_id = Column(String(50), nullable=True)
 
     reservations = relationship("Reservation", back_populates="space", cascade="all, delete-orphan")
     waitlists = relationship("StandbyWaitlist", back_populates="space", cascade="all, delete-orphan")
@@ -129,6 +130,8 @@ class Reservation(Base):
     is_urgent = Column(Boolean, default=False, nullable=False)
     permission_granted = Column(Boolean, default=False, nullable=True)
     last_scanned_at = Column(DateTime, nullable=True)
+    rfid_status = Column(String(50), nullable=True, default=None)
+    rfid_last_tap = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=get_ist_now, nullable=False)
 
     user = relationship("User", back_populates="reservations")

@@ -35,9 +35,25 @@ def process_qr_auto_release_and_standby_rotation(db: Session):
 
     # -------------------------------------------------------------------------
     # 1. Scanned Reservations: Active until end_time passes naturally
+    #    Exception: Students on TEMP_OUT who did not tap back within 15 mins
     # -------------------------------------------------------------------------
-    # Scanned reservations are never expired early by the scheduler.
-    # The active/history classification rule handles transitioning them to history once end_time <= now.
+    temp_out_expired = (
+        db.query(Reservation)
+        .filter(
+            Reservation.status == ReservationStatus.SCANNED,
+            Reservation.rfid_status == "TEMP_OUT",
+            Reservation.rfid_last_tap.isnot(None),
+            Reservation.rfid_last_tap <= now - timedelta(minutes=15),
+            Reservation.end_time > now,
+        )
+        .all()
+    )
+    for res in temp_out_expired:
+        logger.info(f"[AUTO-RELEASE] Reservation {res.id} auto-released: 15-min temp break expired without card tap-in.")
+        res.end_time = now
+        res.rfid_status = "AUTO_RELEASED"
+        expired_count += 1
+        activate_standby_for_slot(db, res.space_id, now, now + timedelta(hours=1), now)
 
     # -------------------------------------------------------------------------
     # 2. Check for Expired 3-Minute Flash Claims on Standby Waitlist

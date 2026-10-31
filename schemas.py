@@ -50,6 +50,7 @@ class SpaceCreate(SpaceBase):
 
 class SpaceResponse(SpaceBase):
     id: uuid.UUID
+    rfid_reader_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -132,6 +133,8 @@ class ReservationResponse(BaseModel):
     is_urgent: bool = False
     permission_granted: bool = False
     last_scanned_at: Optional[datetime] = None
+    rfid_status: Optional[str] = None
+    rfid_last_tap: Optional[datetime] = None
     created_at: datetime
     space: Optional[SpaceResponse] = None
     user: Optional[UserResponse] = None
@@ -257,6 +260,10 @@ class AIParsedBookingResponse(BaseModel):
     message: Optional[str] = None
 
 
+class RFIDExitRequest(BaseModel):
+    action: Literal["temp_break", "checkout"] = "checkout"
+
+
 class QRScanRequest(BaseModel):
     scanned_space_id: Optional[str] = None
 
@@ -294,6 +301,8 @@ class AdminHistoryItemResponse(BaseModel):
     end_time: datetime
     status: ReservationStatus
     is_urgent: bool = False
+    rfid_status: Optional[str] = None
+    rfid_last_tap: Optional[datetime] = None
     created_at: datetime
 
 

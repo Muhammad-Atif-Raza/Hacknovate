@@ -37,6 +37,7 @@ from schemas import (
     AdminProfileResponse,
     QRScanResponse,
     QRScanRequest,
+    RFIDExitRequest,
     AIParsedBookingRequest,
     AIParsedBookingResponse,
     AdminUserListItem,
@@ -47,6 +48,7 @@ from background_tasks import (
     start_scheduler,
     stop_scheduler,
     process_qr_auto_release_and_standby_rotation,
+    activate_standby_for_slot,
 )
 from ml_engine import suggest_optimal_slots
 from seed_data import seed_database
@@ -88,12 +90,12 @@ def validate_operating_hours(start_dt: datetime, end_dt: datetime):
     - Start Time Rule: start_dt.hour >= 9 (cannot start before 09:00 AM).
     - End Time Rule: end_dt.hour < 23 or (end_dt.hour == 23 and end_dt.minute == 0 and end_dt.second == 0) (must finish by 11:00 PM sharp).
     - Order Rule: end_dt > start_dt.
-    If any check fails, raises HTTPException(status_code=400, detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.").
+    If any check fails, raises HTTPException(status_code=400, detail="Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.").
     """
     if start_dt is None or end_dt is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+            detail="Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.",
         )
 
     s = to_naive_ist(start_dt)
@@ -109,21 +111,21 @@ def validate_operating_hours(start_dt: datetime, end_dt: datetime):
     if s.date() != e.date():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+            detail="Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.",
         )
 
     # Start Time Rule: cannot start before 09:00 AM IST
     if s.hour < 9:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+            detail="Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.",
         )
 
     # End Time Rule: must finish by 11:00 PM sharp (23:00:00 IST)
     if e.hour > 23 or (e.hour == 23 and (e.minute > 0 or e.second > 0)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+            detail="Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.",
         )
 
 
@@ -177,6 +179,21 @@ async def lifespan(app: FastAPI):
                 pass
             try:
                 conn.execute(text("ALTER TABLE reservations ADD COLUMN permission_granted BOOLEAN DEFAULT 0"))
+                conn.commit()
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE spaces ADD COLUMN rfid_reader_id VARCHAR(50)"))
+                conn.commit()
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE reservations ADD COLUMN rfid_status VARCHAR(50)"))
+                conn.commit()
+            except Exception:
+                pass
+            try:
+                conn.execute(text("ALTER TABLE reservations ADD COLUMN rfid_last_tap DATETIME"))
                 conn.commit()
             except Exception:
                 pass
@@ -420,6 +437,7 @@ def get_rooms_live_status(
             "name": s.name,
             "capacity": s.capacity,
             "acoustic_profile": s.acoustic_profile.value,
+            "rfid_reader_id": getattr(s, "rfid_reader_id", None),
             "is_occupied": is_in_use_now,
             "is_reserved_next_hour": is_reserved_next_hour,
             "is_reserved": is_reserved_next_hour or is_reserved_today,
@@ -893,6 +911,134 @@ def scan_qr_checkin(
     )
 
 
+@app.post("/api/bookings/{reservation_id}/rfid-entry", tags=["Student Portal", "Access Control"])
+def rfid_entry_tap(
+    reservation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Physical door RFID reader webhook simulation:
+    Marks the reservation as physically occupied:
+    - rfid_status = "INSIDE"
+    - status = ReservationStatus.SCANNED
+    - last_scanned_at = get_ist_now()
+    - rfid_last_tap = get_ist_now()
+    Unlocks the door latch.
+    """
+    reservation = (
+        db.query(Reservation)
+        .options(joinedload(Reservation.space), joinedload(Reservation.user))
+        .filter(Reservation.id == reservation_id)
+        .first()
+    )
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found",
+        )
+
+    if current_user.role != UserRole.ADMIN and reservation.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized for this reservation",
+        )
+
+    now = get_ist_now()
+    reservation.rfid_status = "INSIDE"
+    reservation.status = ReservationStatus.SCANNED
+    reservation.last_scanned_at = now
+    reservation.rfid_last_tap = now
+
+    db.commit()
+    db.refresh(reservation)
+
+    return {
+        "success": True,
+        "message": f"RFID Card tapped successfully! Door unlocked for {reservation.space.name}.",
+        "door_status": "UNLOCKED",
+        "rfid_status": "INSIDE",
+        "reservation": ReservationResponse.model_validate(reservation),
+    }
+
+
+@app.post("/api/bookings/{reservation_id}/rfid-exit", tags=["Student Portal", "Access Control"])
+def rfid_exit_tap(
+    reservation_id: uuid.UUID,
+    payload: Optional[RFIDExitRequest] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Physical door RFID exit reader webhook simulation:
+    Allows two modes:
+    1. 'checkout' (Early Exit / Finished):
+       Immediately completes/releases the booking (end_time = get_ist_now()),
+       freeing the room in Live Room Status for other students!
+    2. 'temp_break' (Stepping out briefly):
+       Logs exit timestamp (rfid_status = 'TEMP_OUT').
+       Warning: If student does not tap back in within 15 mins, system auto-releases room.
+    """
+    reservation = (
+        db.query(Reservation)
+        .options(joinedload(Reservation.space), joinedload(Reservation.user))
+        .filter(Reservation.id == reservation_id)
+        .first()
+    )
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found",
+        )
+
+    if current_user.role != UserRole.ADMIN and reservation.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized for this reservation",
+        )
+
+    action = payload.action if payload else "checkout"
+    now = get_ist_now()
+
+    if action == "checkout":
+        # Immediate release / early exit
+        reservation.end_time = now
+        reservation.rfid_status = "CHECKED_OUT"
+        reservation.rfid_last_tap = now
+        db.commit()
+        db.refresh(reservation)
+
+        # Trigger standby rotation if any waitlisted students exist
+        try:
+            activate_standby_for_slot(db, reservation.space_id, now, reservation.end_time + timedelta(hours=1), now)
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Standby rotation trigger note on checkout: {e}")
+
+        return {
+            "success": True,
+            "message": f"Final exit confirmed. {reservation.space.name} has been released and is now Available for other students!",
+            "action": "checkout",
+            "rfid_status": "CHECKED_OUT",
+            "reservation": ReservationResponse.model_validate(reservation),
+        }
+    else:
+        # temp_break
+        reservation.rfid_status = "TEMP_OUT"
+        reservation.rfid_last_tap = now
+        db.commit()
+        db.refresh(reservation)
+
+        return {
+            "success": True,
+            "message": f"Temporary break logged for {reservation.space.name}. You have 15 minutes to tap back in before the room is auto-released.",
+            "action": "temp_break",
+            "rfid_status": "TEMP_OUT",
+            "warning": "Please tap your RFID card back in within 15 minutes to prevent auto-release.",
+            "reservation": ReservationResponse.model_validate(reservation),
+        }
+
+
 @app.post("/api/bookings/{booking_id}/cancel", response_model=ReservationResponse, tags=["Student Portal"])
 @app.delete("/api/bookings/{booking_id}", response_model=ReservationResponse, tags=["Student Portal"])
 def cancel_student_booking(
@@ -1154,6 +1300,8 @@ def get_allotted_history(
                 end_time=r.end_time,
                 status=r.status,
                 is_urgent=r.is_urgent,
+                rfid_status=getattr(r, "rfid_status", None),
+                rfid_last_tap=getattr(r, "rfid_last_tap", None),
                 created_at=r.created_at,
             )
         )
@@ -1612,7 +1760,7 @@ def ai_parse_booking(
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+                detail="Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.",
             )
 
     # Restrict campus room operating hours to 9:00 AM – 11:00 PM IST (09:00 to 23:00)

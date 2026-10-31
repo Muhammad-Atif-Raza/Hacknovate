@@ -1318,14 +1318,15 @@
               🔄 Refresh List
             </button>
           </div>
-          <div class="table-container" style="background: var(--surface-card); border-radius: var(--radius-card); border: 1px solid var(--border-subtle); overflow-x: auto;">
-            <table class="data-table">
+          <div class="table-container" style="padding: 20px 24px; border-radius: 16px; background: #fffdf9; border: 1px solid var(--border-subtle); overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
               <thead>
                 <tr>
-                  <th>Space / Facility</th>
-                  <th>Capacity</th>
-                  <th>Acoustic Profile</th>
-                  <th>Door Plaque QR Action</th>
+                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Space / Facility</th>
+                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Capacity</th>
+                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Acoustic Profile</th>
+                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">🪪 RFID Reader ID</th>
+                  <th style="text-align: right; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Door Plaque QR Action</th>
                 </tr>
               </thead>
               <tbody id="admin-room-qrs-tbody">
@@ -2056,11 +2057,11 @@
         if (startDate.toDateString() !== endDate.toDateString()) {
           startInput.classList.add('input-error');
           endInput.classList.add('input-error');
-          errors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST (bookings cannot span across midnight).");
+          errors.push("Campus rooms operate strictly between 9:00 AM and 11:00 PM IST (bookings cannot span across midnight).");
         } else if (startHour < 9 || endHour > 23 || (endHour === 23 && (endMinute > 0 || endDate.getSeconds() > 0))) {
           startInput.classList.add('input-error');
           endInput.classList.add('input-error');
-          errors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.");
+          errors.push("Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.");
         }
       }
 
@@ -2527,9 +2528,9 @@
         const eMin = eDate.getMinutes();
 
         if (sDate.toDateString() !== eDate.toDateString()) {
-          modalErrors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST (bookings cannot span across midnight).");
+          modalErrors.push("Campus rooms operate strictly between 9:00 AM and 11:00 PM IST (bookings cannot span across midnight).");
         } else if (sHour < 9 || eHour > 23 || (eHour === 23 && (eMin > 0 || eDate.getSeconds() > 0))) {
-          modalErrors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.");
+          modalErrors.push("Campus rooms operate strictly between 9:00 AM and 11:00 PM IST.");
         } else if (eDate <= sDate) {
           modalErrors.push("End time must be after start time.");
         }
@@ -2621,6 +2622,104 @@
       } catch (err) {
         console.error('Failed to load dashboard:', err);
       }
+    }
+
+    async function handleRfidEntry(resId, roomTitle) {
+      try {
+        const res = await apiRequest(`/api/bookings/${resId}/rfid-entry`, { method: 'POST' });
+        showToast(`🪪 Door Unlocked! ${res.message || 'RFID presence recorded inside room.'}`, 'success');
+        await loadStudentDashboard();
+        if (typeof loadLiveStatusData === 'function') {
+          loadLiveStatusData();
+        }
+      } catch (err) {
+        console.error('RFID entry error:', err);
+        showToast(err.message || 'Failed to simulate RFID card entry tap.', 'error');
+      }
+    }
+
+    async function handleRfidExit(resId, action, roomTitle) {
+      try {
+        const res = await apiRequest(`/api/bookings/${resId}/rfid-exit`, {
+          method: 'POST',
+          body: JSON.stringify({ action })
+        });
+        if (action === 'checkout') {
+          showToast(`🚪 ${res.message || 'Final checkout complete. Room released!'}`, 'success');
+        } else {
+          showToast(`🚶 ${res.message || '15-minute temporary hold active.'}`, 'info');
+        }
+        await loadStudentDashboard();
+        if (typeof loadLiveStatusData === 'function') {
+          loadLiveStatusData();
+        }
+      } catch (err) {
+        console.error('RFID exit error:', err);
+        showToast(err.message || 'Failed to simulate RFID card exit tap.', 'error');
+      }
+    }
+
+    function renderPhysicalAccessPanel(res, roomTitle) {
+      const isQrScanned = res.status === 'Scanned';
+      const rfidStatus = res.rfid_status || (isQrScanned ? 'INSIDE' : 'AWAITING');
+      
+      let rfidBadgeHtml = '';
+      if (rfidStatus === 'INSIDE') {
+        rfidBadgeHtml = `<span class="pill-tag tag-emerald" style="font-weight: 700; background: #d1fae5; color: #065f46; border: 1.5px solid #10b981;">🟢 RFID Presence Active: Inside Room (Door Unlocked)</span>`;
+      } else if (rfidStatus === 'TEMP_OUT') {
+        rfidBadgeHtml = `<span class="pill-tag tag-amber" style="font-weight: 700; background: #fef3c7; color: #92400e; border: 1.5px solid #f59e0b;">🟡 RFID Stepped Out (15m Hold Active)</span>`;
+      } else {
+        rfidBadgeHtml = `<span class="pill-tag tag-neutral" style="font-weight: 600; background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;">🪪 RFID Lock: Awaiting Card Tap-In</span>`;
+      }
+
+      return `
+        <div class="physical-access-panel" style="width: 100%; margin-top: 1.1rem; padding: 1.1rem 1.25rem; background: #fffdfa; border: 1px solid #e7e2da; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="font-size: 0.88rem; font-weight: 700; color: #292524; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <span style="display: inline-flex; align-items: center; gap: 6px;">🔐 <strong>2-Step Physical Presence &amp; Access Control</strong></span>
+            <div>${rfidBadgeHtml}</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.85rem; margin-top: 0.5rem;">
+            <!-- Step 1: Door QR Verification -->
+            <div style="padding: 0.85rem; border-radius: 10px; background: ${isQrScanned ? 'rgba(16, 185, 129, 0.08)' : '#fcfbf9'}; border: 1px solid ${isQrScanned ? '#a7f3d0' : '#e7e2da'}; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div style="font-size: 0.78rem; font-weight: 800; color: ${isQrScanned ? '#065f46' : '#78716c'}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem;">
+                  Step 1: Door QR Verification
+                </div>
+                <div style="font-size: 0.82rem; color: #57534e; margin-bottom: 0.75rem;">
+                  ${isQrScanned ? '✅ Door QR verified at room entrance.' : 'Scan physical door plaque to confirm you are at the correct room.'}
+                </div>
+              </div>
+              <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.5rem 1rem; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: ${isQrScanned ? '#059669' : '#292524'};" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                ${isQrScanned ? '📷 Re-Verify Door QR' : '📷 Scan Door QR'}
+              </button>
+            </div>
+
+            <!-- Step 2: RFID Smart Lock Telemetry -->
+            <div style="padding: 0.85rem; border-radius: 10px; background: ${rfidStatus === 'INSIDE' ? 'rgba(16, 185, 129, 0.08)' : (rfidStatus === 'TEMP_OUT' ? 'rgba(245, 158, 11, 0.08)' : '#fcfbf9')}; border: 1px solid ${rfidStatus === 'INSIDE' ? '#a7f3d0' : (rfidStatus === 'TEMP_OUT' ? '#fde68a' : '#e7e2da')};">
+              <div style="font-size: 0.78rem; font-weight: 800; color: ${rfidStatus === 'INSIDE' ? '#065f46' : (rfidStatus === 'TEMP_OUT' ? '#92400e' : '#78716c')}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem;">
+                Step 2: RFID Smart Lock Telemetry
+              </div>
+              <div style="font-size: 0.82rem; color: #57534e; margin-bottom: 0.75rem;">
+                Dual-factor hardware presence: card tap-in unlocks door and prevents scan-and-leave abuse.
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.5rem 1rem; background: #0284c7; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" onclick="handleRfidEntry('${res.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                  🪪 Tap RFID Card (Enter Room)
+                </button>
+                <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+                  <button class="btn-pill-outline" style="flex: 1; min-width: 120px; font-size: 0.76rem; padding: 0.45rem 0.6rem; color: #d97706; border-color: rgba(217, 119, 6, 0.5); font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 4px;" onclick="handleRfidExit('${res.id}', 'temp_break', '${roomTitle.replace(/'/g, "\\'")}')">
+                    🚶 Tap RFID (Step Out - 15m Hold)
+                  </button>
+                  <button class="btn-pill-outline" style="flex: 1; min-width: 120px; font-size: 0.76rem; padding: 0.45rem 0.6rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.5); font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 4px;" onclick="handleRfidExit('${res.id}', 'checkout', '${roomTitle.replace(/'/g, "\\'")}')">
+                    🚪 Tap RFID (Final Exit &amp; Release Room)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     function renderStudentDashboard(data) {
@@ -2717,46 +2816,48 @@
         }
 
         heroCardsHtml += `
-          <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; border-left: 4px solid #10B981; background: linear-gradient(135deg, rgba(236, 253, 245, 0.6) 0%, #FFFFFF 100%); margin-bottom: 1.5rem;">
-            <div class="checkin-info" style="flex: 1; min-width: 260px;">
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
-                <span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 Checked In & Verified</span>
-                <span class="pill-tag" style="background: rgba(16, 185, 129, 0.15); color: #047857; font-weight: 600;">⏳ ${remainingText}</span>
-                ${getPermissionBadge(scannedRes)}
-              </div>
-              <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
-              <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
-                🕒 <strong>Slot:</strong> ${formatDateTime(scannedRes.start_time)} - ${formatDateTime(scannedRes.end_time)} &bull; <strong style="color: #059669;">${remainingText}</strong>
-              </p>
-              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
-                🎯 <strong>Purpose:</strong> ${scannedRes.purpose}
-              </p>
-
-              ${scannedRes.accompanying_count > 0 ? `
-                <div class="attendees-summary" style="margin-bottom: 0.75rem;">
-                  👥 <strong>Group Reservation (${scannedRes.accompanying_count + 1} People):</strong> Includes ${scannedRes.accompanying_count} verified accompanying attendees.
+          <div class="checkin-hero-card" style="display: flex; flex-direction: column; gap: 1rem; border-left: 4px solid #10B981; background: linear-gradient(135deg, rgba(236, 253, 245, 0.6) 0%, #FFFFFF 100%); margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; width: 100%;">
+              <div class="checkin-info" style="flex: 1; min-width: 260px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
+                  <span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 Checked In & Verified</span>
+                  <span class="pill-tag" style="background: rgba(16, 185, 129, 0.15); color: #047857; font-weight: 600;">⏳ ${remainingText}</span>
+                  ${getPermissionBadge(scannedRes)}
                 </div>
-              ` : ''}
+                <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
+                  🕒 <strong>Slot:</strong> ${formatDateTime(scannedRes.start_time)} - ${formatDateTime(scannedRes.end_time)} &bull; <strong style="color: #059669;">${remainingText}</strong>
+                </p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
+                  🎯 <strong>Purpose:</strong> ${scannedRes.purpose}
+                </p>
 
-              ${hourlyNotice}
+                ${scannedRes.accompanying_count > 0 ? `
+                  <div class="attendees-summary" style="margin-bottom: 0.75rem;">
+                    👥 <strong>Group Reservation (${scannedRes.accompanying_count + 1} People):</strong> Includes ${scannedRes.accompanying_count} verified accompanying attendees.
+                  </div>
+                ` : ''}
+
+                ${hourlyNotice}
+              </div>
+
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 230px;">
+                <div style="background: rgba(16, 185, 129, 0.08); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; width: 100%; border: 1px solid #a7f3d0;">
+                  <div style="font-size: 0.82rem; font-weight: 700; color: #047857; margin-bottom: 0.25rem;">
+                    ● ACTIVE ROOM SESSION
+                  </div>
+                  <div style="font-size: 0.78rem; color: #065f46;">
+                    Physical presence verified &bull; Slot active until ${formatDateTime(scannedRes.end_time)}
+                  </div>
+                </div>
+                <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${scannedRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
+                  ✕ Cancel Booking
+                </button>
+              </div>
             </div>
 
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 230px;">
-              <div style="background: rgba(16, 185, 129, 0.08); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; width: 100%; border: 1px solid #a7f3d0;">
-                <div style="font-size: 0.82rem; font-weight: 700; color: #047857; margin-bottom: 0.25rem;">
-                  ● ACTIVE ROOM SESSION
-                </div>
-                <div style="font-size: 0.78rem; color: #065f46;">
-                  Physical presence verified &bull; Slot active until ${formatDateTime(scannedRes.end_time)}
-                </div>
-              </div>
-              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #059669;" onclick="openCameraScanner('${scannedRes.id}', '${scannedRes.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
-                📷 Scan Door QR / Hourly Re-Verify
-              </button>
-              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${scannedRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
-                ✕ Cancel Booking
-              </button>
-            </div>
+            <!-- 2-Step Physical Access Control Panel -->
+            ${renderPhysicalAccessPanel(scannedRes, roomTitle)}
           </div>
         `;
       });
@@ -2765,49 +2866,51 @@
       bookedCurrentList.forEach(bookedRes => {
         const roomTitle = getRoomName(bookedRes);
         heroCardsHtml += `
-          <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem; border-left: 4px solid #f59e0b;">
-            <div class="checkin-info" style="flex: 1; min-width: 260px;">
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
-                <span class="pill-tag tag-amber" style="font-weight: 700;">⏱️ CHECK-IN OPEN NOW &bull; 15-MIN WINDOW</span>
-                ${getPermissionBadge(bookedRes)}
+          <div class="checkin-hero-card" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; border-left: 4px solid #f59e0b;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; width: 100%;">
+              <div class="checkin-info" style="flex: 1; min-width: 260px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
+                  <span class="pill-tag tag-amber" style="font-weight: 700;">⏱️ CHECK-IN OPEN NOW &bull; 15-MIN WINDOW</span>
+                  ${getPermissionBadge(bookedRes)}
+                </div>
+                <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
+                  🕒 <strong>Slot:</strong> ${formatDateTime(bookedRes.start_time)} - ${formatDateTime(bookedRes.end_time)}
+                </p>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
+                  🎯 <strong>Purpose:</strong> ${bookedRes.purpose}
+                </p>
+
+                ${bookedRes.accompanying_count > 0 ? `
+                  <div class="attendees-summary" style="margin-bottom: 0.75rem;">
+                    👥 <strong>Group Reservation (${bookedRes.accompanying_count + 1} People):</strong> Includes ${bookedRes.accompanying_count} verified accompanying attendees.
+                  </div>
+                ` : ''}
+
+                ${(bookedRes.permission_granted || bookedRes.is_urgent) ? `
+                  <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 0.55rem 0.85rem; margin-top: 0.65rem; font-size: 0.85rem; color: #065f46; border: 1px solid #a7f3d0;">
+                    🎉 <strong>Permission Granted:</strong> Faculty approval confirmed. Scan physical door QR or tap RFID card to complete check-in.
+                  </div>
+                ` : ''}
               </div>
-              <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
-              <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
-                🕒 <strong>Slot:</strong> ${formatDateTime(bookedRes.start_time)} - ${formatDateTime(bookedRes.end_time)}
-              </p>
-              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
-                🎯 <strong>Purpose:</strong> ${bookedRes.purpose}
-              </p>
 
-              ${bookedRes.accompanying_count > 0 ? `
-                <div class="attendees-summary" style="margin-bottom: 0.75rem;">
-                  👥 <strong>Group Reservation (${bookedRes.accompanying_count + 1} People):</strong> Includes ${bookedRes.accompanying_count} verified accompanying attendees.
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 230px;">
+                <div style="background: rgba(30, 41, 59, 0.05); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; width: 100%; border: 1px solid var(--border);">
+                  <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
+                    ⏱️ 15-MIN CHECK-IN WINDOW
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--text-secondary);">
+                    Door QR &amp; RFID Lock active
+                  </div>
                 </div>
-              ` : ''}
-
-              ${(bookedRes.permission_granted || bookedRes.is_urgent) ? `
-                <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 0.55rem 0.85rem; margin-top: 0.65rem; font-size: 0.85rem; color: #065f46; border: 1px solid #a7f3d0;">
-                  🎉 <strong>Permission Granted:</strong> Faculty approval confirmed. Scan physical door QR to complete check-in.
-                </div>
-              ` : ''}
+                <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${bookedRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
+                  ✕ Cancel Booking
+                </button>
+              </div>
             </div>
 
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 230px;">
-              <div style="background: rgba(30, 41, 59, 0.05); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; width: 100%; border: 1px solid var(--border);">
-                <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
-                  ⏱️ 15-MIN CHECK-IN WINDOW
-                </div>
-                <div style="font-size: 0.78rem; color: var(--text-secondary);">
-                  Scan physical door plaque to confirm
-                </div>
-              </div>
-              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="openCameraScanner('${bookedRes.id}', '${bookedRes.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
-                📷 Open Camera to Scan Door QR
-              </button>
-              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${bookedRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
-                ✕ Cancel Booking
-              </button>
-            </div>
+            <!-- 2-Step Physical Access Control Panel -->
+            ${renderPhysicalAccessPanel(bookedRes, roomTitle)}
           </div>
         `;
       });
@@ -2982,6 +3085,7 @@
                 👥 Group: 1 Requester + ${res.accompanying_count} Accompanying Students
               </div>
             ` : ''}
+            ${(res.status === 'Scanned' || (res.status === 'Booked' && isCheckinWindow)) ? renderPhysicalAccessPanel(res, roomTitle) : ''}
           `;
           activeList.appendChild(card);
         });
@@ -3628,8 +3732,14 @@ async function handleCancelStudentBooking(resId, roomName) {
               const canCancel = item.status === 'Booked' || item.status === 'Scanned';
 
               let checkinBadge = '<span class="pill-tag tag-neutral">&mdash;</span>';
-              if (item.status === 'Scanned') {
-                checkinBadge = '<span class="pill-tag tag-emerald" style="font-weight: 600;">🟢 Checked In (Scanned)</span>';
+              if (item.rfid_status === 'INSIDE') {
+                checkinBadge = '<span class="pill-tag tag-emerald" style="font-weight: 600;">🟢 QR + RFID Inside</span>';
+              } else if (item.rfid_status === 'TEMP_OUT') {
+                checkinBadge = '<span class="pill-tag tag-amber" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-weight: 600;">🟡 RFID Stepped Out</span>';
+              } else if (item.rfid_status === 'CHECKED_OUT') {
+                checkinBadge = '<span class="pill-tag tag-neutral" style="font-weight: 600;">🚪 Checked Out</span>';
+              } else if (item.status === 'Scanned') {
+                checkinBadge = '<span class="pill-tag tag-emerald" style="font-weight: 600;">🟢 QR Scanned</span>';
               } else if (item.status === 'Booked') {
                 checkinBadge = '<span class="pill-tag tag-amber" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-weight: 600;">⏳ Pending Check-In</span>';
               } else if (item.status === 'Expired') {
@@ -3674,26 +3784,33 @@ async function handleCancelStudentBooking(resId, roomName) {
     async function loadAdminRoomQRs() {
       const tbody = document.getElementById('admin-room-qrs-tbody');
       if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">Loading facilities...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">Loading facilities...</td></tr>';
       try {
         const spaces = await apiRequest('/api/spaces');
         if (!spaces || spaces.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem;">No facilities found.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1.5rem;">No facilities found.</td></tr>';
           return;
         }
-        tbody.innerHTML = spaces.map(s => {
+        tbody.innerHTML = spaces.map((s, idx) => {
           let acousticTag = 'tag-neutral';
           if (s.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
           if (s.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
           if (s.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
 
+          const rfidId = s.rfid_reader_id || `RFID-DOOR-${String(idx + 1).padStart(2, '0')}`;
+
           return `
             <tr>
-              <td><strong style="color: var(--text-primary); font-size: 0.95rem;">${s.name}</strong></td>
-              <td>${s.capacity} Seats</td>
-              <td><span class="pill-tag ${acousticTag}">${s.acoustic_profile}</span></td>
-              <td>
-                <button class="btn-pill-dark" style="font-size: 0.8rem; padding: 0.4rem 1rem; display: inline-flex; align-items: center; gap: 6px;" onclick='openRoomQRModal(${JSON.stringify(s)})'>
+              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;"><strong style="color: var(--text-primary); font-size: 0.95rem;">${s.name}</strong></td>
+              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;">${s.capacity} Seats</td>
+              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;"><span class="pill-tag ${acousticTag}">${s.acoustic_profile}</span></td>
+              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;">
+                <span class="pill-tag tag-neutral" style="font-family: monospace; font-weight: 600; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; padding: 4px 10px; border-radius: 6px;">
+                  🪪 ${rfidId}
+                </span>
+              </td>
+              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px; text-align: right;">
+                <button class="btn-pill-dark" style="font-size: 0.82rem; padding: 8px 16px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;" onclick='openRoomQRModal(${JSON.stringify(s)})'>
                   🖨️ Print / View QR Code
                 </button>
               </td>
@@ -3702,7 +3819,7 @@ async function handleCancelStudentBooking(resId, roomName) {
         }).join('');
       } catch (err) {
         console.error('Failed to load spaces for QR:', err);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-rose); padding: 1.5rem;">Failed to load facilities.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 1.5rem;">Failed to load facilities.</td></tr>';
       }
     }
 

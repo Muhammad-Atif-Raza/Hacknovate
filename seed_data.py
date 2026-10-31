@@ -30,6 +30,14 @@ def seed_database(db: Session, force_reset: bool = False):
     # Check if already seeded
     existing_spaces_count = db.query(Space).count()
     if existing_spaces_count > 0 and not force_reset:
+        spaces = db.query(Space).order_by(Space.name.asc()).all()
+        updated = False
+        for idx, s in enumerate(spaces):
+            if not getattr(s, "rfid_reader_id", None):
+                s.rfid_reader_id = f"RFID-DOOR-{idx+1:02d}"
+                updated = True
+        if updated:
+            db.commit()
         logger.info("Database already contains spaces. Skipping auto-seed.")
         return {"status": "skipped", "message": "Database already contains seed data."}
 
@@ -72,12 +80,13 @@ def seed_database(db: Session, force_reset: bool = False):
     ]
 
     spaces_map = {}
-    for data in spaces_data:
+    for idx, data in enumerate(spaces_data):
         space = Space(
             id=uuid.uuid4(),
             name=data["name"],
             capacity=data["capacity"],
             acoustic_profile=data["acoustic_profile"],
+            rfid_reader_id=data.get("rfid_reader_id", f"RFID-DOOR-{idx+1:02d}"),
         )
         db.add(space)
         spaces_map[data["name"]] = space
