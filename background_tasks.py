@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 
@@ -11,10 +12,12 @@ logging.basicConfig(level=logging.INFO)
 
 scheduler = AsyncIOScheduler()
 
+IST = pytz.timezone('Asia/Kolkata')
+
 
 def get_ist_now() -> datetime:
-    """Returns current Indian Standard Time (UTC+5:30)."""
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+    """Returns current Indian Standard Time (Asia/Kolkata) as naive datetime."""
+    return datetime.now(IST).replace(tzinfo=None)
 
 
 def process_qr_auto_release_and_standby_rotation(db: Session):

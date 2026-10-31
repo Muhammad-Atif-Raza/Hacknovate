@@ -57,18 +57,24 @@ logging.basicConfig(
 logger = logging.getLogger("campus_api")
 
 
+import pytz
+
+IST = pytz.timezone('Asia/Kolkata')
+
+
 def get_ist_now() -> datetime:
-    """Returns current Indian Standard Time (UTC+5:30)."""
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+    """Returns current Indian Standard Time (Asia/Kolkata) as naive datetime."""
+    return datetime.now(IST).replace(tzinfo=None)
 
 
 def to_naive_utc(dt: datetime) -> datetime:
-    """Normalizes any datetime to naive IST (UTC+5:30) for consistent database comparisons."""
+    """Normalizes any datetime to naive IST (Asia/Kolkata) for consistent database comparisons."""
     if dt is None:
         return None
     if dt.tzinfo is not None:
-        return (dt.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
+        return dt.astimezone(IST).replace(tzinfo=None)
     return dt
+
 
 to_naive_ist = to_naive_utc
 

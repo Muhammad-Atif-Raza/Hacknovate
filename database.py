@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Database URL configuration with PostgreSQL support and SQLite fallback
@@ -15,10 +15,20 @@ is_sqlite = DATABASE_URL.startswith("sqlite")
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if is_sqlite else {},
+    connect_args={"check_same_thread": False} if is_sqlite else {"options": "-c timezone=Asia/Kolkata"},
     pool_pre_ping=True,
     echo=False,
 )
+
+if not is_sqlite:
+    @event.listens_for(engine, "connect")
+    def set_timezone(dbapi_connection, connection_record):
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("SET TIME ZONE 'Asia/Kolkata';")
+            cursor.close()
+        except Exception:
+            pass
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

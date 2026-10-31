@@ -1,13 +1,16 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional, List, Dict
+import pytz
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from models import UserRole, AcousticProfile, ReservationStatus
 
+IST = pytz.timezone('Asia/Kolkata')
+
 
 def get_ist_now() -> datetime:
-    """Returns current Indian Standard Time (UTC+5:30)."""
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+    """Returns current Indian Standard Time (Asia/Kolkata) as naive datetime."""
+    return datetime.now(IST).replace(tzinfo=None)
 
 
 # ==========================================
@@ -91,10 +94,10 @@ class ReservationCreate(BaseModel):
         now_ist = get_ist_now()
         st = self.start_time
         if st.tzinfo is not None:
-            st = (st.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
+            st = st.astimezone(IST).replace(tzinfo=None)
         et = self.end_time
         if et.tzinfo is not None:
-            et = (et.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
+            et = et.astimezone(IST).replace(tzinfo=None)
 
         if st < now_ist - timedelta(minutes=15):
             raise ValueError("Start time cannot be in the past. Please select a future date and time.")
@@ -159,10 +162,10 @@ class StandbyJoinRequest(BaseModel):
         now_ist = get_ist_now()
         st = self.requested_start
         if st.tzinfo is not None:
-            st = (st.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
+            st = st.astimezone(IST).replace(tzinfo=None)
         et = self.requested_end
         if et.tzinfo is not None:
-            et = (et.astimezone(timezone.utc) + timedelta(hours=5, minutes=30)).replace(tzinfo=None)
+            et = et.astimezone(IST).replace(tzinfo=None)
 
         if st < now_ist - timedelta(minutes=15):
             raise ValueError("Requested start time cannot be in the past.")
