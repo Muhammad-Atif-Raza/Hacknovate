@@ -127,6 +127,7 @@ class Reservation(Base):
         nullable=False,
     )
     is_urgent = Column(Boolean, default=False, nullable=False)
+    permission_granted = Column(Boolean, default=False, nullable=True)
     last_scanned_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=get_ist_now, nullable=False)
 

@@ -129,6 +129,11 @@ async def lifespan(app: FastAPI):
                 conn.commit()
             except Exception:
                 pass
+            try:
+                conn.execute(text("ALTER TABLE reservations ADD COLUMN permission_granted BOOLEAN DEFAULT 0"))
+                conn.commit()
+            except Exception:
+                pass
     except Exception as e:
         logger.warning(f"Column migration check note: {e}")
 
@@ -215,7 +220,7 @@ def health_check():
         "timestamp": get_ist_now().isoformat(),
         "utc_now": datetime.utcnow().isoformat(),
         "ist_now": get_ist_now().isoformat(),
-        "build": "build-2026-10-31-cancel-v2",
+        "build": "build-2026-10-31-permission-history-v3",
         "version": "2.0.0",
     }
 
@@ -365,28 +370,32 @@ def get_user_dashboard(
     # HISTORY = status in (Cancelled, Denied, Expired) OR end_time <= get_ist_now()
     # A Scanned reservation must NEVER go to history because of its status alone.
     active_reservations = []
-    history_reservations = []
-
     for res in reservations:
         if classify_reservation(res, now) == "ACTIVE":
             active_reservations.append(res)
-        if classify_reservation(res, now) == "HISTORY" or res.status == ReservationStatus.SCANNED:
-            history_reservations.append(res)
 
-    # Group history: Remove 'Scanned' from any history-by-status list!
+    # Complete booking history showing all past and future reservations with show-up status
     grouped_history = {
-        "All": [ReservationResponse.model_validate(r) for r in history_reservations],
+        "All": [ReservationResponse.model_validate(r) for r in reservations],
         "Completed": [
-            ReservationResponse.model_validate(r) for r in history_reservations
-            if r.status not in [ReservationStatus.EXPIRED, ReservationStatus.DENIED]
+            ReservationResponse.model_validate(r) for r in reservations
+            if r.status == ReservationStatus.SCANNED
+        ],
+        "Showed_Up": [
+            ReservationResponse.model_validate(r) for r in reservations
+            if r.status == ReservationStatus.SCANNED
         ],
         ReservationStatus.EXPIRED.value: [
-            ReservationResponse.model_validate(r) for r in history_reservations
-            if r.status == ReservationStatus.EXPIRED
+            ReservationResponse.model_validate(r) for r in reservations
+            if r.status == ReservationStatus.EXPIRED or (r.status == ReservationStatus.BOOKED and r.end_time <= now)
         ],
         ReservationStatus.DENIED.value: [
-            ReservationResponse.model_validate(r) for r in history_reservations
+            ReservationResponse.model_validate(r) for r in reservations
             if r.status == ReservationStatus.DENIED
+        ],
+        "Upcoming": [
+            ReservationResponse.model_validate(r) for r in reservations
+            if r.status in [ReservationStatus.BOOKED, ReservationStatus.PENDING_PERMISSION] and r.end_time > now
         ],
     }
 
@@ -403,7 +412,7 @@ def get_user_dashboard(
     )
 
     validated_active = [ReservationResponse.model_validate(r) for r in active_reservations]
-    validated_history = [ReservationResponse.model_validate(r) for r in history_reservations]
+    validated_history = [ReservationResponse.model_validate(r) for r in reservations]
 
     return UserDashboardResponse(
         user=UserResponse.model_validate(current_user),
@@ -1088,6 +1097,7 @@ def admin_make_decision(
                 )
 
         reservation.status = ReservationStatus.BOOKED
+        reservation.permission_granted = True
 
         # Increment student's total_bookings
         student = db.query(User).filter(User.id == reservation.user_id).first()

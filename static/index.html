@@ -1157,7 +1157,7 @@
       </div>
 
       <div class="section-header-row" style="margin-top: 2rem;">
-        <h3 class="section-title">📋 Active & Pending Requests</h3>
+        <h3 class="section-title">📋 Current & Future Bookings</h3>
       </div>
       <div id="student-active-list">
         <!-- Render current active/pending bookings -->
@@ -1169,10 +1169,11 @@
       <div class="section-header-row">
         <h3 class="section-title">📜 My Booking History</h3>
         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button class="nav-tab-btn active" onclick="filterHistory('All')">All</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Completed')">Completed</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Expired')">Expired / No-Show</button>
-          <button class="nav-tab-btn" onclick="filterHistory('Denied')">Denied / Cancelled</button>
+          <button class="nav-tab-btn active" onclick="filterHistory('All')">All Bookings</button>
+          <button class="nav-tab-btn" onclick="filterHistory('Showed_Up')">🟢 Showed Up</button>
+          <button class="nav-tab-btn" onclick="filterHistory('Expired')">❌ Did Not Show Up</button>
+          <button class="nav-tab-btn" onclick="filterHistory('Denied')">🚫 Cancelled / Denied</button>
+          <button class="nav-tab-btn" onclick="filterHistory('Upcoming')">📅 Upcoming</button>
         </div>
       </div>
       <div id="history-cards-container">
@@ -1368,7 +1369,6 @@
               <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading accounts...</div>
             </div>
           </div>
-        </div>
       </div>
     </div>
   </main>
@@ -2597,11 +2597,35 @@
         }
         return false;
       });
+
       const scannedList = allActive.filter(b => b.status === 'Scanned');
-      const bookedList = allActive.filter(b => b.status === 'Booked');
+      // For Booked reservations: split into current check-in window (slot starting within 15 min or active now) vs future
+      const bookedCurrentList = allActive.filter(b => {
+        if (b.status !== 'Booked') return false;
+        const startTime = new Date(b.start_time);
+        const checkinWindowStart = new Date(startTime.getTime() - 15 * 60000);
+        return now >= checkinWindowStart;
+      });
+      const bookedFutureList = allActive.filter(b => {
+        if (b.status !== 'Booked') return false;
+        const startTime = new Date(b.start_time);
+        const checkinWindowStart = new Date(startTime.getTime() - 15 * 60000);
+        return now < checkinWindowStart;
+      });
       const pendingList = allActive.filter(b => b.status === 'Pending_Permission');
 
       let heroCardsHtml = '';
+
+      // Helper to generate Permission Granted badge
+      const getPermissionBadge = (res) => {
+        if (res.permission_granted || (res.is_urgent && (res.status === 'Booked' || res.status === 'Scanned'))) {
+          return '<span class="pill-tag tag-emerald" style="margin-left: 6px; font-weight: 700; background: #d1fae5; color: #065f46; border: 1.5px solid #10b981;">✅ Permission Granted</span>';
+        }
+        if (res.is_urgent && res.status === 'Pending_Permission') {
+          return '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>';
+        }
+        return '';
+      };
 
       // 2A. Active Scanned Session (🟢 Checked In & Verified)
       scannedList.forEach(scannedRes => {
@@ -2632,7 +2656,7 @@
               <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
                 <span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 Checked In & Verified</span>
                 <span class="pill-tag" style="background: rgba(16, 185, 129, 0.15); color: #047857; font-weight: 600;">⏳ ${remainingText}</span>
-                ${scannedRes.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 4px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
+                ${getPermissionBadge(scannedRes)}
               </div>
               <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
               <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
@@ -2660,10 +2684,10 @@
                   Physical presence verified &bull; Slot active until ${formatDateTime(scannedRes.end_time)}
                 </div>
               </div>
-              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #059669;" onclick="openCameraScanner('${scannedRes.id}', '${scannedRes.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
+              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #059669;" onclick="openCameraScanner('${scannedRes.id}', '${scannedRes.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
                 📷 Scan Door QR / Hourly Re-Verify
               </button>
-              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${scannedRes.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${scannedRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
                 ✕ Cancel Booking
               </button>
             </div>
@@ -2671,14 +2695,16 @@
         `;
       });
 
-      // 2B. Booked Reservation Requiring 15-Minute Physical Check-in
-      bookedList.forEach(bookedRes => {
+      // 2B. Booked Reservation in Active 15-Minute Check-in Window
+      bookedCurrentList.forEach(bookedRes => {
         const roomTitle = getRoomName(bookedRes);
         heroCardsHtml += `
-          <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem;">
+          <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem; border-left: 4px solid #f59e0b;">
             <div class="checkin-info" style="flex: 1; min-width: 260px;">
-              <span class="pill-tag tag-amber" style="margin-bottom: 0.65rem;">ACTION REQUIRED &bull; 15-MIN PHYSICAL CHECK-IN</span>
-              ${bookedRes.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
+                <span class="pill-tag tag-amber" style="font-weight: 700;">⏱️ CHECK-IN OPEN NOW &bull; 15-MIN WINDOW</span>
+                ${getPermissionBadge(bookedRes)}
+              </div>
               <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
               <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
                 🕒 <strong>Slot:</strong> ${formatDateTime(bookedRes.start_time)} - ${formatDateTime(bookedRes.end_time)}
@@ -2692,6 +2718,12 @@
                   👥 <strong>Group Reservation (${bookedRes.accompanying_count + 1} People):</strong> Includes ${bookedRes.accompanying_count} verified accompanying attendees.
                 </div>
               ` : ''}
+
+              ${(bookedRes.permission_granted || bookedRes.is_urgent) ? `
+                <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 0.55rem 0.85rem; margin-top: 0.65rem; font-size: 0.85rem; color: #065f46; border: 1px solid #a7f3d0;">
+                  🎉 <strong>Permission Granted:</strong> Faculty approval confirmed. Scan physical door QR to complete check-in.
+                </div>
+              ` : ''}
             </div>
 
             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 230px;">
@@ -2703,10 +2735,10 @@
                   Scan physical door plaque to confirm
                 </div>
               </div>
-              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="openCameraScanner('${bookedRes.id}', '${bookedRes.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
+              <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="openCameraScanner('${bookedRes.id}', '${bookedRes.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
                 📷 Open Camera to Scan Door QR
               </button>
-              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${bookedRes.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${bookedRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
                 ✕ Cancel Booking
               </button>
             </div>
@@ -2714,14 +2746,66 @@
         `;
       });
 
-      // 2C. Pending Permission Awaiting Faculty Approval
+      // 2C. Booked Reservation in Future (Confirmed & Upcoming)
+      bookedFutureList.forEach(bookedRes => {
+        const roomTitle = getRoomName(bookedRes);
+        const startTime = new Date(bookedRes.start_time);
+        const checkinOpenTime = new Date(startTime.getTime() - 15 * 60000);
+
+        heroCardsHtml += `
+          <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem; border-left: 4px solid #3b82f6;">
+            <div class="checkin-info" style="flex: 1; min-width: 260px;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
+                <span class="pill-tag tag-blue" style="font-weight: 700;">📅 UPCOMING RESERVATION &bull; CONFIRMED</span>
+                ${getPermissionBadge(bookedRes)}
+              </div>
+              <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
+              <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
+                🕒 <strong>Slot:</strong> ${formatDateTime(bookedRes.start_time)} - ${formatDateTime(bookedRes.end_time)}
+              </p>
+              <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
+                🎯 <strong>Purpose:</strong> ${bookedRes.purpose}
+              </p>
+
+              ${bookedRes.accompanying_count > 0 ? `
+                <div class="attendees-summary" style="margin-bottom: 0.75rem;">
+                  👥 <strong>Group Reservation (${bookedRes.accompanying_count + 1} People):</strong> Includes ${bookedRes.accompanying_count} verified accompanying attendees.
+                </div>
+              ` : ''}
+
+              <div style="background: rgba(59, 130, 246, 0.08); border-radius: 8px; padding: 0.6rem 0.85rem; margin-top: 0.65rem; font-size: 0.85rem; color: #1e40af; border: 1px solid #bfdbfe;">
+                ${(bookedRes.permission_granted || bookedRes.is_urgent) ? '🎉 <strong>Permission Granted:</strong> Faculty approval granted! ' : ''}
+                ℹ️ Physical Door QR check-in window opens 15 minutes before slot start (at <strong>${formatDateTime(checkinOpenTime)}</strong>).
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 230px;">
+              <div style="background: rgba(30, 41, 59, 0.05); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; width: 100%; border: 1px solid var(--border);">
+                <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
+                  📅 SCHEDULED BOOKING
+                </div>
+                <div style="font-size: 0.78rem; color: var(--text-secondary);">
+                  Confirmed for ${formatDateTime(bookedRes.start_time)}
+                </div>
+              </div>
+              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${bookedRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
+                ✕ Cancel Booking
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      // 2D. Pending Permission Awaiting Faculty Approval
       pendingList.forEach(pendingRes => {
         const roomTitle = getRoomName(pendingRes);
         heroCardsHtml += `
           <div class="checkin-hero-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; border-left: 4px solid #f59e0b; margin-bottom: 1.5rem;">
             <div class="checkin-info" style="flex: 1; min-width: 260px;">
-              <span class="pill-tag tag-amber" style="margin-bottom: 0.65rem;">⏳ Awaiting Faculty Approval</span>
-              <span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT OVERRIDE</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap;">
+                <span class="pill-tag tag-amber" style="font-weight: 700;">⏳ Awaiting Faculty Approval</span>
+                <span class="pill-tag tag-rose" style="font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT OVERRIDE</span>
+              </div>
               <h3 style="font-size: 1.45rem; margin-bottom: 0.5rem; color: var(--text-primary);">${roomTitle}</h3>
               <p style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 0.95rem;">
                 🕒 <strong>Requested Slot:</strong> ${formatDateTime(pendingRes.start_time)} - ${formatDateTime(pendingRes.end_time)}
@@ -2730,11 +2814,11 @@
                 🎯 <strong>Purpose:</strong> ${pendingRes.purpose}
               </p>
               <p style="color: #92400e; font-size: 0.85rem; background: rgba(245, 158, 11, 0.1); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #fde68a;">
-                ℹ️ This urgent override request is currently under review by Faculty and Administrators. Physical Door QR check-in will be enabled automatically as soon as approval is granted.
+                ℹ️ This urgent override request is currently under review by Faculty and Administrators. Status will update to <strong>Permission Granted</strong> immediately once approved.
               </p>
             </div>
             <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 200px;">
-              <button class="btn-pill-outline" style="padding: 0.65rem 1.25rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${pendingRes.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+              <button class="btn-pill-outline" style="padding: 0.65rem 1.25rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${pendingRes.id}', '${roomTitle.replace(/'/g, "\'")}')">
                 ✕ Withdraw Request
               </button>
             </div>
@@ -2748,39 +2832,47 @@
         activeContainer.innerHTML = `
           <div style="background: var(--surface-card); border: 1px dashed var(--border); border-radius: var(--radius-card); padding: 2rem; text-align: center;">
             <p style="color: var(--text-secondary); font-size: 0.95rem;">
-              No active reservations requiring physical check-in right now.
+              No active or upcoming bookings at the moment.
             </p>
           </div>
         `;
       }
 
-      // 3. Active & Pending List
+      // 3. Current & Future Bookings List
       const activeList = document.getElementById('student-active-list');
       activeList.innerHTML = '';
 
       if (!allActive || allActive.length === 0) {
         activeList.innerHTML = `
-          <p style="color: var(--text-secondary); font-size: 0.9rem;">No active or pending requests at the moment.</p>
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">No active or upcoming bookings at the moment.</p>
         `;
       } else {
         allActive.forEach(res => {
-          let statusTag = 'tag-amber';
-          let statusLabel = res.status.replace('_', ' ');
+          let statusTag = 'tag-blue';
+          let statusLabel = '📅 Upcoming';
           let remainingBadge = '';
+          const startTime = new Date(res.start_time);
+          const endTime = new Date(res.end_time);
+          const checkinOpenTime = new Date(startTime.getTime() - 15 * 60000);
+          const isCheckinWindow = now >= checkinOpenTime && now <= endTime;
 
-          if (res.status === 'Booked') {
-            statusTag = 'tag-blue';
-            statusLabel = 'Booked';
-          } else if (res.status === 'Scanned') {
+          if (res.status === 'Scanned') {
             statusTag = 'tag-emerald';
-            statusLabel = '🟢 Checked In';
-            const endTime = new Date(res.end_time);
+            statusLabel = '🟢 In Session';
             const diffMs = endTime - now;
             if (diffMs > 0) {
               const hoursLeft = Math.floor(diffMs / 3600000);
               const minsLeft = Math.max(1, Math.floor((diffMs % 3600000) / 60000));
               const remText = hoursLeft > 0 ? `${hoursLeft}h ${minsLeft}m left` : `${minsLeft}m left`;
               remainingBadge = `<span class="pill-tag" style="background: rgba(16, 185, 129, 0.12); color: #047857; font-weight: 600; margin-left: 6px;">⏳ ${remText}</span>`;
+            }
+          } else if (res.status === 'Booked') {
+            if (isCheckinWindow) {
+              statusTag = 'tag-amber';
+              statusLabel = '⏱️ Check-In Open Now';
+            } else {
+              statusTag = 'tag-blue';
+              statusLabel = '📅 Confirmed';
             }
           } else if (res.status === 'Pending_Permission') {
             statusTag = 'tag-amber';
@@ -2795,22 +2887,22 @@
               <div>
                 <span class="pill-tag ${statusTag}">${statusLabel}</span>
                 ${remainingBadge}
-                ${res.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
+                ${getPermissionBadge(res)}
                 <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${roomTitle}</h4>
               </div>
               <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem;">
                 <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.start_time)}</span>
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
-                  ${res.status === 'Booked' ? `
-                    <button class="btn-pill-dark" style="padding: 0.45rem 0.9rem; font-size: 0.82rem;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                  ${res.status === 'Booked' && isCheckinWindow ? `
+                    <button class="btn-pill-dark" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 5px;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
                       📷 Open Camera to Scan Door QR
                     </button>
                   ` : res.status === 'Scanned' ? `
-                    <button class="btn-pill-dark" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; background: #059669;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                    <button class="btn-pill-dark" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; background: #059669; display: inline-flex; align-items: center; gap: 5px;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\'")}')">
                       📷 Re-Verify Door QR
                     </button>
                   ` : ''}
-                  <button class="btn-pill-outline" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; color: #dc2626; border: 1.5px solid #ef4444; background: rgba(239, 68, 68, 0.06); font-weight: 600; border-radius: 9999px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="handleCancelStudentBooking('${res.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                  <button class="btn-pill-outline" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; color: #dc2626; border: 1.5px solid #ef4444; background: rgba(239, 68, 68, 0.06); font-weight: 600; border-radius: 9999px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="handleCancelStudentBooking('${res.id}', '${roomTitle.replace(/'/g, "\'")}')">
                     ${res.status === 'Pending_Permission' ? '✕ Withdraw Request' : '✕ Cancel Booking'}
                   </button>
                 </div>
@@ -3112,15 +3204,11 @@ async function handleCancelStudentBooking(resId, roomName) {
       container.innerHTML = '';
 
       let items = [];
+      const currentNow = new Date();
+
       if (Array.isArray(history)) {
-        if (AppState.historyFilter === 'All') {
-          items = history;
-        } else if (AppState.historyFilter === 'Completed') {
-          items = history.filter(item => item.status !== 'Expired' && item.status !== 'Denied');
-        } else {
-          items = history.filter(item => item.status === AppState.historyFilter);
-        }
-      } else {
+        items = [...history];
+      } else if (history && typeof history === 'object') {
         if (AppState.historyFilter === 'All') {
           items = history['All'] || Object.values(history).flat();
         } else {
@@ -3128,17 +3216,18 @@ async function handleCancelStudentBooking(resId, roomName) {
         }
       }
 
-      // Safety guarantee: Exclude any active reservations (status in Booked/Pending_Permission/Scanned AND end_time in future)
-      const currentNow = new Date();
-      items = items.filter(item => {
-        if (!item || !item.status) return false;
-        if (['Booked', 'Pending_Permission', 'Scanned'].includes(item.status) && item.end_time && new Date(item.end_time) > currentNow) {
-          return false;
-        }
-        return true;
-      });
+      // Filter by selection
+      if (AppState.historyFilter === 'Showed_Up' || AppState.historyFilter === 'Completed') {
+        items = items.filter(item => item.status === 'Scanned' || item.status === 'Completed');
+      } else if (AppState.historyFilter === 'Expired') {
+        items = items.filter(item => item.status === 'Expired' || (item.status === 'Booked' && item.end_time && new Date(item.end_time) <= currentNow));
+      } else if (AppState.historyFilter === 'Denied') {
+        items = items.filter(item => item.status === 'Denied');
+      } else if (AppState.historyFilter === 'Upcoming') {
+        items = items.filter(item => ['Booked', 'Pending_Permission'].includes(item.status) && item.end_time && new Date(item.end_time) > currentNow);
+      }
 
-      if (items.length === 0) {
+      if (!items || items.length === 0) {
         container.innerHTML = `
           <div style="background: var(--surface); border: 1px dashed var(--border); border-radius: 16px; padding: 2.5rem; text-align: center; color: var(--text-secondary);">
             No records found for filter: <strong>${AppState.historyFilter}</strong>
@@ -3153,11 +3242,69 @@ async function handleCancelStudentBooking(resId, roomName) {
       items.forEach(item => {
         let tagClass = 'tag-neutral';
         let statusLabel = item.status.replace('_', ' ');
-        if (item.status === 'Scanned' || item.status === 'Completed' || item.status === 'Booked') {
+        let attendanceBadge = '';
+        const startTime = new Date(item.start_time);
+        const endTime = new Date(item.end_time);
+        const isPast = endTime <= currentNow;
+        const isFuture = startTime > currentNow;
+
+        // Whether the user showed up or not
+        if (item.status === 'Scanned') {
           tagClass = 'tag-emerald';
-          statusLabel = 'Completed';
-        } else if (item.status === 'Expired' || item.status === 'Denied') {
+          statusLabel = '🟢 Showed Up & Verified';
+          attendanceBadge = `
+            <div style="font-size: 0.84rem; color: #047857; margin-top: 0.4rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <span>✅ <strong>Attendance:</strong> Student showed up (Physical door QR verified)</span>
+            </div>
+          `;
+        } else if (item.status === 'Expired' || (item.status === 'Booked' && isPast)) {
           tagClass = 'tag-rose';
+          statusLabel = '❌ Did Not Show Up (No-Show)';
+          attendanceBadge = `
+            <div style="font-size: 0.84rem; color: #b91c1c; margin-top: 0.4rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <span>❌ <strong>Attendance:</strong> Did not show up (Missed 15-minute door check-in window)</span>
+            </div>
+          `;
+        } else if (item.status === 'Denied') {
+          tagClass = 'tag-neutral';
+          statusLabel = '🚫 Cancelled / Denied';
+          attendanceBadge = `
+            <div style="font-size: 0.84rem; color: #64748b; margin-top: 0.4rem; display: flex; align-items: center; gap: 6px;">
+              <span>🚫 <strong>Attendance:</strong> N/A (Reservation cancelled or rejected)</span>
+            </div>
+          `;
+        } else if (item.status === 'Pending_Permission') {
+          tagClass = 'tag-amber';
+          statusLabel = '⏳ Awaiting Faculty Approval';
+          attendanceBadge = `
+            <div style="font-size: 0.84rem; color: #b45309; margin-top: 0.4rem; display: flex; align-items: center; gap: 6px;">
+              <span>⏳ <strong>Attendance:</strong> Pending Faculty Approval</span>
+            </div>
+          `;
+        } else if (item.status === 'Booked' && isFuture) {
+          tagClass = 'tag-blue';
+          statusLabel = '📅 Upcoming (Confirmed)';
+          attendanceBadge = `
+            <div style="font-size: 0.84rem; color: #2563eb; margin-top: 0.4rem; display: flex; align-items: center; gap: 6px;">
+              <span>📅 <strong>Attendance:</strong> Scheduled (Check-in opens 15m prior to start)</span>
+            </div>
+          `;
+        } else if (item.status === 'Booked' && !isPast && !isFuture) {
+          tagClass = 'tag-amber';
+          statusLabel = '⏱️ Check-In Window Open';
+          attendanceBadge = `
+            <div style="font-size: 0.84rem; color: #b45309; margin-top: 0.4rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <span>⏱️ <strong>Attendance:</strong> In Check-In Window (Pending door scan)</span>
+            </div>
+          `;
+        }
+
+        // Permission Granted Pill
+        let permPill = '';
+        if (item.permission_granted || (item.is_urgent && (item.status === 'Booked' || item.status === 'Scanned'))) {
+          permPill = '<span class="pill-tag tag-emerald" style="margin-left: 6px; font-weight: 700; background: #d1fae5; color: #065f46; border: 1.5px solid #10b981;">✅ Permission Granted</span>';
+        } else if (item.is_urgent) {
+          permPill = '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>';
         }
 
         const card = document.createElement('div');
@@ -3166,19 +3313,20 @@ async function handleCancelStudentBooking(resId, roomName) {
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
             <div>
               <span class="pill-tag ${tagClass}">${statusLabel}</span>
-              ${item.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
+              ${permPill}
               <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${getRoomName(item)}</h4>
             </div>
             <span style="font-size: 0.82rem; color: var(--text-muted);">${formatDateTime(item.start_time)}</span>
           </div>
-          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.35rem;">
             🕒 ${formatDateTime(item.start_time)} - ${formatDateTime(item.end_time)} &bull; Purpose: ${item.purpose}
           </p>
           ${item.accompanying_count > 0 ? `
-            <div class="attendees-summary">
+            <div class="attendees-summary" style="margin-bottom: 0.35rem;">
               👥 Group of ${item.accompanying_count + 1} students (1 requester + ${item.accompanying_count} verified attendees)
             </div>
           ` : ''}
+          ${attendanceBadge}
         `;
         container.appendChild(card);
       });

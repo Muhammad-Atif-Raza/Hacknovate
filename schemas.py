@@ -130,6 +130,7 @@ class ReservationResponse(BaseModel):
     end_time: datetime
     status: ReservationStatus
     is_urgent: bool = False
+    permission_granted: bool = False
     last_scanned_at: Optional[datetime] = None
     created_at: datetime
     space: Optional[SpaceResponse] = None
@@ -146,6 +147,8 @@ class ReservationResponse(BaseModel):
                 self.space_name = None
         if not self.room_name:
             self.room_name = self.space_name
+        if self.is_urgent and self.status in (ReservationStatus.BOOKED, ReservationStatus.SCANNED):
+            self.permission_granted = True
         return self
 
 
