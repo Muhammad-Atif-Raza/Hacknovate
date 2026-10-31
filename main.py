@@ -81,6 +81,52 @@ def to_naive_utc(dt: datetime) -> datetime:
 to_naive_ist = to_naive_utc
 
 
+def validate_operating_hours(start_dt: datetime, end_dt: datetime):
+    """
+    Restricts campus room operating hours to 9:00 AM – 11:00 PM IST (09:00 to 23:00):
+    - Same-Day Rule: start_dt.date() == end_dt.date() (bookings cannot span overnight across midnight).
+    - Start Time Rule: start_dt.hour >= 9 (cannot start before 09:00 AM).
+    - End Time Rule: end_dt.hour < 23 or (end_dt.hour == 23 and end_dt.minute == 0 and end_dt.second == 0) (must finish by 11:00 PM sharp).
+    - Order Rule: end_dt > start_dt.
+    If any check fails, raises HTTPException(status_code=400, detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.").
+    """
+    if start_dt is None or end_dt is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+        )
+
+    s = to_naive_ist(start_dt)
+    e = to_naive_ist(end_dt)
+
+    if e <= s:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="End time must be after start time.",
+        )
+
+    # Same-Day Rule: bookings cannot span overnight across midnight
+    if s.date() != e.date():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+        )
+
+    # Start Time Rule: cannot start before 09:00 AM IST
+    if s.hour < 9:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+        )
+
+    # End Time Rule: must finish by 11:00 PM sharp (23:00:00 IST)
+    if e.hour > 23 or (e.hour == 23 and (e.minute > 0 or e.second > 0)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+        )
+
+
 def classify_reservation(res: Reservation, now: Optional[datetime] = None) -> str:
     """
     Classification rule, applied in ONE place and reused by dashboard and history:
@@ -646,6 +692,9 @@ def create_booking(
     """
     start_utc = to_naive_utc(payload.start_time)
     end_utc = to_naive_utc(payload.end_time)
+
+    # Restrict campus room operating hours to 9:00 AM – 11:00 PM IST (09:00 to 23:00)
+    validate_operating_hours(start_utc, end_utc)
 
     now = get_ist_now()
     if start_utc < now - timedelta(minutes=15):
@@ -1533,9 +1582,18 @@ def ai_parse_booking(
         hour = future_time.hour
         minute = future_time.minute
     elif "now" in text or hour is None:
-        # Default to now (local time)
-        hour = now.hour
-        minute = now.minute
+        # Smart Default Window: 9:00 AM – 11:00 PM IST
+        if now.hour < 9:
+            target_date = now.date()
+            hour = 9
+            minute = 0
+        elif now.hour >= 22:
+            target_date = (now + timedelta(days=1)).date()
+            hour = 9
+            minute = 0
+        else:
+            hour = now.hour
+            minute = now.minute
 
     start_dt = datetime(target_date.year, target_date.month, target_date.day, hour, minute)
     if "now" not in text and start_dt < (now - timedelta(minutes=15)) and "tomorrow" not in text and target_date == now.date():
@@ -1544,6 +1602,21 @@ def ai_parse_booking(
     duration_match = re.search(r'(?:for\s+)?(\d+)\s*(?:hours?|hrs?)', text)
     duration_hrs = int(duration_match.group(1)) if duration_match else 1
     end_dt = start_dt + timedelta(hours=duration_hrs)
+
+    # If requested duration pushes end_time past 23:00, cap at 23:00 if >= 30 mins remain, else reject
+    if end_dt.date() != start_dt.date() or end_dt.hour > 23 or (end_dt.hour == 23 and (end_dt.minute > 0 or end_dt.second > 0)):
+        day_close = datetime(start_dt.year, start_dt.month, start_dt.day, 23, 0)
+        remaining_seconds = (day_close - start_dt).total_seconds()
+        if remaining_seconds >= 1800:
+            end_dt = day_close
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.",
+            )
+
+    # Restrict campus room operating hours to 9:00 AM – 11:00 PM IST (09:00 to 23:00)
+    validate_operating_hours(start_dt, end_dt)
 
     # 5. Purpose Extraction (Strip duration, headcount, and filler FIRST)
     cleaned_prompt = payload.prompt

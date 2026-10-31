@@ -1653,26 +1653,45 @@
       });
     }
 
-    // Set initial date/time (24/7 availability)
+    // Set initial date/time with 9:00 AM – 11:00 PM IST restriction
     function initializeDateTimeInputs() {
       const now = new Date();
-      let targetDate = new Date(now);
-      targetDate.setMinutes(Math.ceil(targetDate.getMinutes() / 15) * 15, 0, 0);
-      if (targetDate <= now) {
-        targetDate = new Date(targetDate.getTime() + 15 * 60000);
-      }
+      let start, end;
 
-      const start = new Date(targetDate);
-      const end = new Date(start.getTime() + 60 * 60000); // 1 hour duration
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const openMinutes = 9 * 60; // 09:00 AM
+      const lateCutoffMinutes = 22 * 60 + 30; // 10:30 PM (22:30)
+
+      if (currentMinutes < openMinutes) {
+        // Before 9:00 AM -> Default to Today 09:00 – 10:00
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0, 0);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0, 0);
+      } else if (currentMinutes >= lateCutoffMinutes) {
+        // After 10:30 PM (22:30) -> Default to Tomorrow 09:00 – 10:00
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60000);
+        start = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 9, 0, 0, 0);
+        end = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 10, 0, 0, 0);
+      } else {
+        // Within operating hours: round up to next 15 mins
+        let targetDate = new Date(now);
+        targetDate.setMinutes(Math.ceil(targetDate.getMinutes() / 15) * 15, 0, 0);
+        if (targetDate <= now) {
+          targetDate = new Date(targetDate.getTime() + 15 * 60000);
+        }
+        start = new Date(targetDate);
+        end = new Date(start.getTime() + 60 * 60000); // 1 hour duration
+        // If end time exceeds 23:00, cap end at 23:00
+        const maxEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 0, 0, 0);
+        if (end > maxEnd) {
+          end = maxEnd;
+        }
+      }
 
       const startInput = document.getElementById('search-start');
       const endInput = document.getElementById('search-end');
 
       if (startInput && endInput) {
-        startInput.min = toLocalISOString(new Date(now.getTime() - 2 * 60000));
         startInput.value = toLocalISOString(start);
-
-        endInput.min = toLocalISOString(new Date(start.getTime() + 15 * 60000));
         endInput.value = toLocalISOString(end);
       }
     }
@@ -1690,7 +1709,12 @@
 
       const currentEndDate = new Date(endInput.value);
       if (isNaN(currentEndDate.getTime()) || currentEndDate <= startDate) {
-        endInput.value = toLocalISOString(new Date(startDate.getTime() + 60 * 60000));
+        let proposedEnd = new Date(startDate.getTime() + 60 * 60000);
+        const dayClose = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 23, 0, 0, 0);
+        if (proposedEnd > dayClose && startDate < dayClose) {
+          proposedEnd = dayClose;
+        }
+        endInput.value = toLocalISOString(proposedEnd);
       }
     }
 
@@ -2022,6 +2046,21 @@
         if (endDate <= startDate) {
           endInput.classList.add('input-error');
           errors.push("End time must be after start time.");
+        }
+
+        const startHour = startDate.getHours();
+        const endHour = endDate.getHours();
+        const endMinute = endDate.getMinutes();
+
+        // Operating Hours Validation: 9:00 AM – 11:00 PM IST
+        if (startDate.toDateString() !== endDate.toDateString()) {
+          startInput.classList.add('input-error');
+          endInput.classList.add('input-error');
+          errors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST (bookings cannot span across midnight).");
+        } else if (startHour < 9 || endHour > 23 || (endHour === 23 && (endMinute > 0 || endDate.getSeconds() > 0))) {
+          startInput.classList.add('input-error');
+          endInput.classList.add('input-error');
+          errors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.");
         }
       }
 
@@ -2477,6 +2516,23 @@
 
       if (isUrgent && usedUrgent >= 3) {
         modalErrors.push("Monthly urgent request quota (3/3) exhausted.");
+      }
+
+      // Check Operating Hours (9:00 AM – 11:00 PM IST)
+      if (AppState.searchParams && AppState.searchParams.startTime && AppState.searchParams.endTime) {
+        const sDate = new Date(AppState.searchParams.startTime);
+        const eDate = new Date(AppState.searchParams.endTime);
+        const sHour = sDate.getHours();
+        const eHour = eDate.getHours();
+        const eMin = eDate.getMinutes();
+
+        if (sDate.toDateString() !== eDate.toDateString()) {
+          modalErrors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST (bookings cannot span across midnight).");
+        } else if (sHour < 9 || eHour > 23 || (eHour === 23 && (eMin > 0 || eDate.getSeconds() > 0))) {
+          modalErrors.push("Campus rooms can only be booked between 9:00 AM and 11:00 PM IST.");
+        } else if (eDate <= sDate) {
+          modalErrors.push("End time must be after start time.");
+        }
       }
 
       // If validation fails, display clean friendly bulleted summary inside the modal
@@ -4016,10 +4072,28 @@ async function handleCancelStudentBooking(resId, roomName) {
       }
 
       const now = new Date();
-      // Round to next 5 minutes
-      const rem = 5 - (now.getMinutes() % 5);
-      const start = new Date(now.getTime() + rem * 60000);
-      const end = new Date(start.getTime() + 60 * 60000);
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      let start, end;
+
+      if (currentMinutes < 9 * 60) {
+        // Before 9:00 AM -> Default to Today 09:00 – 10:00
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0, 0);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0, 0);
+      } else if (currentMinutes >= 22 * 60 + 30) {
+        // After 10:30 PM (22:30) -> Default to Tomorrow 09:00 – 10:00
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60000);
+        start = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 9, 0, 0, 0);
+        end = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 10, 0, 0, 0);
+      } else {
+        // Round to next 5 minutes
+        const rem = 5 - (now.getMinutes() % 5);
+        start = new Date(now.getTime() + rem * 60000);
+        end = new Date(start.getTime() + 60 * 60000);
+        const dayClose = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 0, 0, 0);
+        if (end > dayClose) {
+          end = dayClose;
+        }
+      }
 
       const startIso = toLocalISOString(start);
       const endIso = toLocalISOString(end);
