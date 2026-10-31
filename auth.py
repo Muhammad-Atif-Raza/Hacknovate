@@ -94,19 +94,21 @@ def require_admin(
     return current_user
 
 
+SUPER_ADMIN_EMAILS = {"tanmay.singh26@st.niituniversity.in"}
+ALLOWED_DOMAINS = ("@st.niituniversity.in", "@niituniversity.in")
+
+
 def determine_role_from_email(email: str, dev_role: Optional[UserRole] = None) -> UserRole:
     """
     Determines user role strictly based on university email:
-    - Emails with '.fac@st.niituniversity.in' (or containing '.fac@') are assigned ADMIN role (Admin's panel).
-    - Emails with '@st.niituniversity.in' are assigned STUDENT role.
-    - Legacy/test emails (admin@campus.edu -> ADMIN, others fallback to dev_role/STUDENT).
+    - 'tanmay.singh26@st.niituniversity.in' is Super Admin.
+    - Legacy faculty or admin emails are admin.
+    - All other @st.niituniversity.in emails are student by default (can be granted admin from website).
     """
     email_lower = email.strip().lower()
-    if ".fac@" in email_lower or email_lower.endswith(".fac@st.niituniversity.in") or email_lower == "admin@campus.edu":
+    if email_lower in SUPER_ADMIN_EMAILS or email_lower == "admin@campus.edu" or ".fac@" in email_lower:
         return UserRole.ADMIN
-    if email_lower.endswith("@st.niituniversity.in"):
-        return UserRole.STUDENT
-    return dev_role if dev_role else UserRole.STUDENT
+    return UserRole.STUDENT
 
 
 @auth_router.post("/google", response_model=AuthResponse)
@@ -165,9 +167,14 @@ def authenticate_google(
             detail="Unable to obtain valid email from authentication provider",
         )
 
-    # Determine role strictly from university email pattern:
-    # @st.niituniversity.in is for students, .fac@st.niituniversity.in is for admin panel
-    role: UserRole = determine_role_from_email(email, payload.dev_role)
+    email_lower = email.strip().lower()
+    if not any(email_lower.endswith(dom) for dom in ALLOWED_DOMAINS) and email_lower != "admin@campus.edu":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Restricted: Only @st.niituniversity.in accounts are permitted to sign in.",
+        )
+
+    role: UserRole = determine_role_from_email(email_lower, payload.dev_role)
 
     # Upsert User in database
     user = db.query(User).filter(User.email == email).first()
@@ -210,7 +217,9 @@ def authenticate_google(
             user.name = name
         if photo_url:
             user.photo_url = photo_url
-        user.role = role
+        if email_lower in SUPER_ADMIN_EMAILS:
+            user.role = UserRole.ADMIN
+        # NOTE: For existing users, preserve user.role so admin privileges granted via website persist!
         db.commit()
         db.refresh(user)
 

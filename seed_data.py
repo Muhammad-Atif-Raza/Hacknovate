@@ -87,6 +87,15 @@ def seed_database(db: Session, force_reset: bool = False):
     # -------------------------------------------------------------
     # 2. Users (Admin + Pre-seeded Students including Agrim)
     # -------------------------------------------------------------
+    admin_tanmay = User(
+        id="ADM-2026-001",
+        email="tanmay.singh26@st.niituniversity.in",
+        name="Tanmay Singh",
+        photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=tanmay.singh26@st.niituniversity.in",
+        role=UserRole.ADMIN,
+        total_bookings=0,
+    )
+
     admin_user = User(
         id="ADM-001",
         email="sarah.connor.fac@st.niituniversity.in",
@@ -142,7 +151,7 @@ def seed_database(db: Session, force_reset: bool = False):
         total_bookings=5,
     )
 
-    db.add_all([admin_user, user_agrim, student_alex, student_priya, legacy_admin, legacy_agrim])
+    db.add_all([admin_tanmay, admin_user, user_agrim, student_alex, student_priya, legacy_admin, legacy_agrim])
     db.flush()
 
     # -------------------------------------------------------------

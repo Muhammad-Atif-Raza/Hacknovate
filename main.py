@@ -39,6 +39,8 @@ from schemas import (
     QRScanRequest,
     AIParsedBookingRequest,
     AIParsedBookingResponse,
+    AdminUserListItem,
+    GrantAdminRequest,
 )
 from auth import auth_router, get_current_user, require_admin
 from background_tasks import (
@@ -133,6 +135,23 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_database(db, force_reset=False)
+        tanmay = db.query(User).filter(User.email == "tanmay.singh26@st.niituniversity.in").first()
+        if not tanmay:
+            tanmay = User(
+                id="ADM-2026-001",
+                email="tanmay.singh26@st.niituniversity.in",
+                name="Tanmay Singh",
+                photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=tanmay.singh26@st.niituniversity.in",
+                role=UserRole.ADMIN,
+                total_bookings=0,
+            )
+            db.add(tanmay)
+            db.commit()
+            logger.info("Pre-seeded Super Admin: Tanmay Singh (tanmay.singh26@st.niituniversity.in)")
+        else:
+            if tanmay.role != UserRole.ADMIN:
+                tanmay.role = UserRole.ADMIN
+                db.commit()
     except Exception as e:
         logger.error(f"Auto-seed error on startup: {e}")
     finally:
@@ -1148,6 +1167,111 @@ def admin_cancel_all_reservations(
     db.query(User).update({User.total_bookings: 0, User.urgent_requests_used: 0})
     db.commit()
     return {"message": "All campus reservations have been successfully cancelled. All rooms are now 100% Free/Available."}
+
+
+# =====================================================================
+# Admin Access Control & Role Management
+# =====================================================================
+@app.get("/api/admin/users", response_model=List[AdminUserListItem], tags=["Admin Portal"])
+def get_admin_users(
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Lists all registered campus users and their roles for admin management."""
+    users = db.query(User).order_by(User.role.asc(), User.name.asc()).all()
+    return [
+        AdminUserListItem(
+            id=u.id,
+            email=u.email,
+            name=u.name,
+            role=u.role.value if hasattr(u.role, "value") else str(u.role),
+            photo_url=u.photo_url,
+            total_bookings=u.total_bookings or 0,
+            is_super_admin=(u.email.lower() == "tanmay.singh26@st.niituniversity.in"),
+        )
+        for u in users
+    ]
+
+
+@app.post("/api/admin/users/grant-admin", tags=["Admin Portal"])
+def grant_admin_by_email(
+    payload: GrantAdminRequest,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Grants Admin role to any @st.niituniversity.in email from the website.
+    If user hasn't logged in yet, pre-provisions an admin user account.
+    """
+    email_clean = payload.email.strip().lower()
+    if not (email_clean.endswith("@st.niituniversity.in") or email_clean.endswith("@niituniversity.in")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Domain Restricted: Only @st.niituniversity.in accounts can be granted admin privileges.",
+        )
+
+    target_role = UserRole.ADMIN if payload.role.lower() == "admin" else UserRole.STUDENT
+    user = db.query(User).filter(User.email == email_clean).first()
+
+    if user:
+        if user.email.lower() == "tanmay.singh26@st.niituniversity.in" and target_role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Primary Super Admin (tanmay.singh26@st.niituniversity.in) cannot be demoted.",
+            )
+        user.role = target_role
+        db.commit()
+        db.refresh(user)
+        return {
+            "message": f"Successfully updated {user.name} ({user.email}) to role {target_role.value}.",
+            "user": UserResponse.model_validate(user),
+        }
+    else:
+        new_id = f"ADM-{uuid.uuid4().hex[:8].upper()}" if target_role == UserRole.ADMIN else f"STU-{uuid.uuid4().hex[:8].upper()}"
+        formatted_name = email_clean.split("@")[0].replace(".", " ").title()
+        new_user = User(
+            id=new_id,
+            email=email_clean,
+            name=formatted_name,
+            photo_url=f"https://api.dicebear.com/7.x/bottts/svg?seed={email_clean}",
+            role=target_role,
+            total_bookings=0,
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return {
+            "message": f"Pre-provisioned {formatted_name} ({email_clean}) with role {target_role.value}.",
+            "user": UserResponse.model_validate(new_user),
+        }
+
+
+@app.post("/api/admin/users/{user_id}/toggle-role", tags=["Admin Portal"])
+def toggle_user_role(
+    user_id: str,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Allows an Admin to promote or demote a user directly from the website."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.email.lower() == "tanmay.singh26@st.niituniversity.in":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Primary Super Admin (tanmay.singh26@st.niituniversity.in) cannot be demoted.",
+        )
+
+    new_role = UserRole.STUDENT if user.role == UserRole.ADMIN else UserRole.ADMIN
+    user.role = new_role
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": f"User {user.name} ({user.email}) role changed to {new_role.value}.",
+        "user": UserResponse.model_validate(user),
+    }
 
 
 # =====================================================================

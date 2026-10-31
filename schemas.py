@@ -303,3 +303,21 @@ class AdminProfileResponse(BaseModel):
 class QRScanResponse(BaseModel):
     message: str
     reservation: ReservationResponse
+
+
+class AdminUserListItem(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    photo_url: Optional[str] = None
+    total_bookings: int = 0
+    is_super_admin: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GrantAdminRequest(BaseModel):
+    email: str
+    role: Literal["admin", "student"] = "admin"
+
