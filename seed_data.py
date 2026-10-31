@@ -115,11 +115,11 @@ def seed_database(db: Session, force_reset: bool = False):
     )
 
     user_agrim = User(
-        id="STU-2026-001",
+        id="ADM-2026-002",
         email="agrim.goel26@st.niituniversity.in",
-        name="Agrim Goel",
+        name="Agrim Goel (Faculty Admin)",
         photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=agrim.goel26@st.niituniversity.in",
-        role=UserRole.STUDENT,
+        role=UserRole.ADMIN,
         total_bookings=4,
         urgent_requests_used=1,
     )
@@ -136,7 +136,7 @@ def seed_database(db: Session, force_reset: bool = False):
     legacy_agrim = User(
         id="STU-2026-004",
         email="agrimgoel14@gmail.com",
-        name="Agrim Goel (Legacy)",
+        name="Agrim Goel (Student)",
         photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=agrimgoel14@gmail.com",
         role=UserRole.STUDENT,
         total_bookings=0,

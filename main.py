@@ -220,6 +220,34 @@ async def lifespan(app: FastAPI):
             if tanmay.role != UserRole.ADMIN:
                 tanmay.role = UserRole.ADMIN
                 db.commit()
+
+        # Whitelist and ensure Agrim Goel has Faculty/Admin role
+        agrim = db.query(User).filter(User.email == "agrim.goel26@st.niituniversity.in").first()
+        if not agrim:
+            agrim = User(
+                id="ADM-2026-002",
+                email="agrim.goel26@st.niituniversity.in",
+                name="Agrim Goel (Faculty Admin)",
+                photo_url="https://api.dicebear.com/7.x/bottts/svg?seed=agrim.goel26@st.niituniversity.in",
+                role=UserRole.ADMIN,
+                total_bookings=4,
+            )
+            db.add(agrim)
+            db.commit()
+            logger.info("Pre-seeded Admin User: Agrim Goel (agrim.goel26@st.niituniversity.in)")
+        else:
+            if agrim.role != UserRole.ADMIN:
+                agrim.role = UserRole.ADMIN
+                db.commit()
+                logger.info("Ensured Admin role for agrim.goel26@st.niituniversity.in on startup.")
+
+        # Ensure agrimgoel14@gmail.com stays student role
+        agrim_student = db.query(User).filter(User.email == "agrimgoel14@gmail.com").first()
+        if agrim_student:
+            if agrim_student.role != UserRole.STUDENT:
+                agrim_student.role = UserRole.STUDENT
+                db.commit()
+                logger.info("Ensured Student role for agrimgoel14@gmail.com on startup.")
     except Exception as e:
         logger.error(f"Auto-seed error on startup: {e}")
     finally:

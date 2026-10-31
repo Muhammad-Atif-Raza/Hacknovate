@@ -1007,6 +1007,7 @@
           <span class="pill-tag tag-emerald" id="student-header-bookings">0 Bookings</span>
           <span class="pill-tag tag-rose" id="student-header-urgencies" style="margin-left: 4px; font-size: 0.75rem;">3/3 Urgencies</span>
         </div>
+        <button id="student-toggle-role-btn" class="btn-pill-dark" style="display: none; padding: 0.45rem 0.85rem; font-size: 0.82rem; background: #0284c7; gap: 5px; align-items: center;" onclick="handleToggleRole()">🔄 Switch Role</button>
         <button class="btn-pill-outline" style="padding: 0.45rem 1rem; font-size: 0.82rem;" onclick="signOut()">Sign Out</button>
       </div>
 
@@ -1016,6 +1017,7 @@
         <div class="pill-badge">
           <span id="admin-header-name">Dr. Connor</span>
         </div>
+        <button id="admin-toggle-role-btn" class="btn-pill-dark" style="display: none; padding: 0.45rem 0.85rem; font-size: 0.82rem; background: #0284c7; gap: 5px; align-items: center;" onclick="handleToggleRole()">🔄 Switch Role</button>
         <button class="btn-pill-outline" style="padding: 0.45rem 1rem; font-size: 0.82rem;" onclick="signOut()">Sign Out</button>
       </div>
     </div>
@@ -1945,6 +1947,16 @@
 
       publicBtn.style.display = 'none';
 
+      const canToggle = AppState.user && (
+        AppState.user.email === 'agrim.goel26@st.niituniversity.in' ||
+        AppState.user.email === 'tanmay.singh26@st.niituniversity.in' ||
+        AppState.user.role === 'admin'
+      );
+      const studentToggleBtn = document.getElementById('student-toggle-role-btn');
+      const adminToggleBtn = document.getElementById('admin-toggle-role-btn');
+      if (studentToggleBtn) studentToggleBtn.style.display = canToggle ? 'inline-flex' : 'none';
+      if (adminToggleBtn) adminToggleBtn.style.display = canToggle ? 'inline-flex' : 'none';
+
       if (AppState.user.role === 'admin') {
         studentNav.style.display = 'none';
         adminNav.style.display = 'inline-flex';
@@ -1965,6 +1977,31 @@
           urgElem.className = urgenciesRemaining === 0 ? 'pill-tag tag-neutral' : 'pill-tag tag-rose';
         }
         showView('student');
+      }
+    }
+
+    async function handleToggleRole() {
+      try {
+        const res = await apiRequest('/api/auth/toggle-role', { method: 'POST' });
+        if (res.access_token) {
+          AppState.token = res.access_token;
+          localStorage.setItem('auth_token', res.access_token);
+        }
+        if (res.user) {
+          AppState.user = res.user;
+          localStorage.setItem('user_data', JSON.stringify(res.user));
+        }
+        showToast(res.message || `Switched role to ${res.role}!`, 'success');
+        syncUIState();
+        if (res.role === 'admin') {
+          switchAdminPanel('overview');
+        } else {
+          switchStudentTab('dashboard');
+          loadStudentDashboard();
+        }
+      } catch (err) {
+        console.error('Role toggle error:', err);
+        showToast(err.message || 'Failed to switch role.', 'error');
       }
     }
 

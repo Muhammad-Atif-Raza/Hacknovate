@@ -117,6 +117,10 @@ def require_admin(
 
 
 SUPER_ADMIN_EMAILS = {"tanmay.singh26@st.niituniversity.in"}
+ADMIN_EMAILS = {
+    "agrim.goel26@st.niituniversity.in",
+    "tanmay.singh26@st.niituniversity.in",
+}
 ALLOWED_DOMAINS = ("@st.niituniversity.in", "@niituniversity.in")
 ALLOWED_HOSTED_DOMAINS = {"st.niituniversity.in", "niituniversity.in"}
 
@@ -124,12 +128,21 @@ ALLOWED_HOSTED_DOMAINS = {"st.niituniversity.in", "niituniversity.in"}
 def determine_role_from_email(email: str) -> UserRole:
     """
     Determines user role strictly based on university email:
+    - 'agrim.goel26@st.niituniversity.in' is Faculty / Admin.
     - 'tanmay.singh26@st.niituniversity.in' is Super Admin.
-    - Legacy faculty or admin emails are admin.
+    - Demo emails starting with 'admin' or 'faculty' or containing '.fac@' are admin.
+    - 'agrimgoel14@gmail.com' stays a student account.
     - All other @st.niituniversity.in emails are student by default (can be granted admin from website).
     """
     email_lower = email.strip().lower()
-    if email_lower in SUPER_ADMIN_EMAILS or ".fac@" in email_lower:
+    if email_lower == "agrimgoel14@gmail.com":
+        return UserRole.STUDENT
+    if (
+        email_lower in ADMIN_EMAILS
+        or email_lower.startswith("admin")
+        or email_lower.startswith("faculty")
+        or ".fac@" in email_lower
+    ):
         return UserRole.ADMIN
     return UserRole.STUDENT
 
@@ -202,14 +215,6 @@ def authenticate_google(
     # Upsert User in database
     user = db.query(User).filter(User.email == email).first()
 
-    # Migration alias for Agrim Goel:
-    if not user and email == "agrim.goel26@st.niituniversity.in":
-        user = db.query(User).filter(User.email == "agrimgoel14@gmail.com").first()
-        if user:
-            user.email = "agrim.goel26@st.niituniversity.in"
-            db.commit()
-            db.refresh(user)
-
     # Migration alias for Sarah Connor:
     if not user and email == "sarah.connor.fac@st.niituniversity.in":
         user = db.query(User).filter(User.email == "admin@campus.edu").first()
@@ -240,9 +245,15 @@ def authenticate_google(
             user.name = name
         if photo_url:
             user.photo_url = photo_url
-        if email_lower in SUPER_ADMIN_EMAILS:
+        if (
+            email_lower in ADMIN_EMAILS
+            or email_lower.startswith("admin")
+            or email_lower.startswith("faculty")
+            or ".fac@" in email_lower
+        ):
             user.role = UserRole.ADMIN
-        # NOTE: For existing users, preserve user.role so admin privileges granted via website persist!
+        elif email_lower == "agrimgoel14@gmail.com":
+            user.role = UserRole.STUDENT
         db.commit()
         db.refresh(user)
 
@@ -267,6 +278,50 @@ def authenticate_google(
 def logout():
     """Sign-out endpoint for client UI session clearing."""
     return {"message": "Successfully logged out. Please clear your access token from client storage."}
+
+
+@auth_router.post("/toggle-role")
+def toggle_user_role(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    1-Click Role Toggle for demo administrators (specifically agrim.goel26@st.niituniversity.in and super admins).
+    Flips role between 'admin' and 'student'.
+    Returns updated user, new role, and fresh JWT token.
+    """
+    allowed_toggle_emails = {
+        "agrim.goel26@st.niituniversity.in",
+        "tanmay.singh26@st.niituniversity.in",
+    }
+    email_lower = (current_user.email or "").strip().lower()
+    if email_lower not in allowed_toggle_emails and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Role toggle is reserved for Faculty Administrators.",
+        )
+
+    # Flip role
+    new_role = UserRole.STUDENT if current_user.role == UserRole.ADMIN else UserRole.ADMIN
+    current_user.role = new_role
+    db.commit()
+    db.refresh(current_user)
+
+    # Generate fresh JWT token with new role
+    token_claims = {
+        "sub": current_user.id,
+        "email": current_user.email,
+        "role": current_user.role.value,
+        "name": current_user.name,
+    }
+    new_access_token = create_access_token(token_claims)
+
+    return {
+        "message": f"Role switched successfully to {new_role.value.capitalize()}!",
+        "role": new_role.value,
+        "access_token": new_access_token,
+        "user": UserResponse.model_validate(current_user),
+    }
 
 
 @auth_router.get("/config", response_model=AuthConfigResponse)

@@ -132,6 +132,35 @@ def run_all_tests():
         assert resp.json()["role"] == "admin"
         print("[OK] tanmay.singh26@st.niituniversity.in successfully authenticated with Super Admin role.")
 
+    # Agrim Goel Admin Whitelist Test
+    with patch("google.oauth2.id_token.verify_oauth2_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "agrim.goel26@st.niituniversity.in",
+            "email_verified": True,
+            "hd": "st.niituniversity.in",
+            "name": "Agrim Goel",
+        }
+        resp = client.post("/api/auth/google", json={"id_token": "agrim-token"})
+        assert resp.status_code == 200
+        agrim_auth = resp.json()
+        assert agrim_auth["role"] == "admin"
+        agrim_headers = {"Authorization": f"Bearer {agrim_auth['access_token']}"}
+        print("[OK] agrim.goel26@st.niituniversity.in authenticated with Faculty Admin role.")
+
+    # 1-Click Role Toggle Test for Agrim Goel
+    resp = client.post("/api/auth/toggle-role", headers=agrim_headers)
+    assert resp.status_code == 200
+    toggle_data = resp.json()
+    assert toggle_data["role"] == "student"
+    print("[OK] 1-Click Role Toggle: Successfully switched role to Student.")
+    agrim_student_headers = {"Authorization": f"Bearer {toggle_data['access_token']}"}
+
+    # Toggle back to Admin
+    resp = client.post("/api/auth/toggle-role", headers=agrim_student_headers)
+    assert resp.status_code == 200
+    assert resp.json()["role"] == "admin"
+    print("[OK] 1-Click Role Toggle: Successfully switched back to Faculty Admin.")
+
     # Logout endpoint test
     resp = client.post("/api/auth/logout")
     assert resp.status_code == 200
