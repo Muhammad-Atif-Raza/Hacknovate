@@ -2493,6 +2493,10 @@
           localStorage.setItem('user_data', JSON.stringify(data.user));
           syncUIState();
         }
+        const activeList = data.active_reservations || data.active_bookings || [];
+        data.active_reservations = activeList;
+        data.active_bookings = activeList;
+
         renderStudentDashboard(data);
         renderStudentHistory(data.history_by_status || data.history || {});
       } catch (err) {
@@ -2531,8 +2535,8 @@
 
       // 2. Active Booking Card / Green Scanned Banner / Pending Requests
       const activeContainer = document.getElementById('active-booking-container');
-      const allActive = data.active_bookings || data.active_reservations || [];
-      const scannedList = allActive.filter(b => b.status === 'Scanned' && new Date(b.end_time) > now);
+      const allActive = data.active_reservations || data.active_bookings || [];
+      const scannedList = allActive.filter(b => b.status === 'Scanned');
       const bookedList = allActive.filter(b => b.status === 'Booked');
       const pendingList = allActive.filter(b => b.status === 'Pending_Permission');
 

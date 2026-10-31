@@ -301,7 +301,24 @@ def get_user_dashboard(
     """
     now = get_ist_now()
 
-    # Fetch user's reservations with space relations
+    # Active reservations query: explicitly includes BOOKED, PENDING_PERMISSION, and SCANNED where end_time > get_ist_now()
+    active_res = (
+        db.query(Reservation)
+        .options(joinedload(Reservation.space))
+        .filter(
+            Reservation.user_id == current_user.id,
+            Reservation.status.in_([
+                ReservationStatus.BOOKED,
+                ReservationStatus.PENDING_PERMISSION,
+                ReservationStatus.SCANNED,
+            ]),
+            Reservation.end_time > now,
+        )
+        .order_by(Reservation.start_time.desc())
+        .all()
+    )
+
+    # Fetch user's reservations with space relations for full history grouping
     reservations = (
         db.query(Reservation)
         .options(joinedload(Reservation.space))
@@ -309,17 +326,6 @@ def get_user_dashboard(
         .order_by(Reservation.start_time.desc())
         .all()
     )
-
-    # Active bookings:
-    # 1. Booked and Pending_Permission reservations
-    # 2. Scanned reservations whose end_time > now (remains on active dashboard until slot expires)
-    active_bookings = [
-        res for res in reservations
-        if (
-            res.status in [ReservationStatus.BOOKED, ReservationStatus.PENDING_PERMISSION]
-            or (res.status == ReservationStatus.SCANNED and res.end_time > now)
-        )
-    ]
 
     # Group full history by status
     # Scanned reservations move to history only once the booking time slot has fully elapsed
@@ -331,10 +337,11 @@ def get_user_dashboard(
         ReservationStatus.DENIED.value: [],
     }
 
+    active_ids = {r.id for r in active_res}
     for res in reservations:
         status_key = res.status.value
         # If Scanned and slot has not elapsed yet, it stays active on dashboard and does not move to history
-        if res.status == ReservationStatus.SCANNED and res.end_time > now:
+        if res.id in active_ids and res.status == ReservationStatus.SCANNED:
             continue
         if status_key in grouped_history:
             grouped_history[status_key].append(ReservationResponse.model_validate(res))
@@ -351,7 +358,7 @@ def get_user_dashboard(
         .all()
     )
 
-    validated_active = [ReservationResponse.model_validate(r) for r in active_bookings]
+    validated_active = [ReservationResponse.model_validate(r) for r in active_res]
 
     return UserDashboardResponse(
         user=UserResponse.model_validate(current_user),
