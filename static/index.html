@@ -1318,21 +1318,20 @@
               🔄 Refresh List
             </button>
           </div>
-          <div class="table-container" style="padding: 20px 24px; border-radius: 16px; background: #fffdf9; border: 1px solid var(--border-subtle); overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr>
-                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Space / Facility</th>
-                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Capacity</th>
-                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Acoustic Profile</th>
-                  <th style="text-align: left; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">🪪 RFID Reader ID</th>
-                  <th style="text-align: right; padding: 14px 20px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c; border-bottom: 1px solid #e7e2da;">Door Plaque QR Action</th>
-                </tr>
-              </thead>
-              <tbody id="admin-room-qrs-tbody">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <div id="admin-room-qrs" class="admin-room-qrs-container" style="display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 1000px; margin-top: 20px;">
+            <!-- Header Bar -->
+            <div style="display: grid; grid-template-columns: 2.2fr 1fr 1.2fr 1.2fr 1.6fr; gap: 24px; padding: 12px 24px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #78716c;">
+              <div>Space / Facility</div>
+              <div>Capacity</div>
+              <div>Acoustic Profile</div>
+              <div>🪪 RFID Reader ID</div>
+              <div style="text-align: right;">Door Plaque QR Action</div>
+            </div>
+
+            <!-- List of Room Row Cards -->
+            <div id="admin-room-qrs-list" style="display: flex; flex-direction: column; gap: 14px;">
+              <!-- Dynamically populated -->
+            </div>
           </div>
         </div>
 
@@ -3782,16 +3781,16 @@ async function handleCancelStudentBooking(resId, roomName) {
     // ROOM QR MANAGEMENT & PRINTABLE DOOR PLAQUES
     // =====================================================================
     async function loadAdminRoomQRs() {
-      const tbody = document.getElementById('admin-room-qrs-tbody');
-      if (!tbody) return;
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">Loading facilities...</td></tr>';
+      const container = document.getElementById('admin-room-qrs-list') || document.getElementById('admin-room-qrs') || document.getElementById('admin-room-qrs-tbody');
+      if (!container) return;
+      container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 14px;">Loading facilities...</div>';
       try {
         const spaces = await apiRequest('/api/spaces');
         if (!spaces || spaces.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 1.5rem;">No facilities found.</td></tr>';
+          container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary); font-size: 14px;">No facilities found.</div>';
           return;
         }
-        tbody.innerHTML = spaces.map((s, idx) => {
+        container.innerHTML = spaces.map((s, idx) => {
           let acousticTag = 'tag-neutral';
           if (s.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
           if (s.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
@@ -3800,28 +3799,31 @@ async function handleCancelStudentBooking(resId, roomName) {
           const rfidId = s.rfid_reader_id || `RFID-DOOR-${String(idx + 1).padStart(2, '0')}`;
 
           return `
-            <tr>
-              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;"><strong style="color: var(--text-primary); font-size: 0.95rem;">${s.name}</strong></td>
-              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;">${s.capacity} Seats</td>
-              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;"><span class="pill-tag ${acousticTag}">${s.acoustic_profile}</span></td>
-              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px;">
+            <div class="room-qr-row-card" style="display: grid; grid-template-columns: 2.2fr 1fr 1.2fr 1.2fr 1.6fr; gap: 24px; align-items: center; padding: 18px 24px; background: #fffdf9; border: 1px solid #e7e2da; border-radius: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+              <div style="font-weight: 700; font-size: 15px; color: #1c1917;">${s.name}</div>
+              <div style="font-size: 14px; color: #57534e;">${s.capacity} Seats</div>
+              <div><span class="pill-tag ${acousticTag}">${s.acoustic_profile}</span></div>
+              <div>
                 <span class="pill-tag tag-neutral" style="font-family: monospace; font-weight: 600; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; padding: 4px 10px; border-radius: 6px;">
                   🪪 ${rfidId}
                 </span>
-              </td>
-              <td style="padding: 16px 20px; vertical-align: middle; border-bottom: 1px solid #f0ece1; font-size: 14px; text-align: right;">
-                <button class="btn-pill-dark" style="font-size: 0.82rem; padding: 8px 16px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;" onclick='openRoomQRModal(${JSON.stringify(s)})'>
+              </div>
+              <div style="text-align: right;">
+                <button class="btn-pill-dark" style="font-size: 0.85rem; padding: 10px 18px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;" onclick='openRoomQRModal(${JSON.stringify(s)})'>
                   🖨️ Print / View QR Code
                 </button>
-              </td>
-            </tr>
+              </div>
+            </div>
           `;
         }).join('');
       } catch (err) {
         console.error('Failed to load spaces for QR:', err);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--accent-rose); padding: 1.5rem;">Failed to load facilities.</td></tr>';
+        container.innerHTML = '<div style="text-align: center; color: var(--accent-rose); padding: 2rem; font-size: 14px;">Failed to load facilities.</div>';
       }
     }
+
+    window.loadAdminRoomQrs = loadAdminRoomQRs;
+    window.loadAdminRoomQRs = loadAdminRoomQRs;
 
     function openRoomQRModal(space) {
       document.getElementById('plaque-room-name').textContent = space.name;
