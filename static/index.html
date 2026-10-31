@@ -2515,7 +2515,7 @@
         data.active_bookings = activeList;
 
         renderStudentDashboard(data);
-        renderStudentHistory(data.history_by_status || data.history || {});
+        renderStudentHistory(data.history || data.history_by_status || []);
       } catch (err) {
         console.error('Failed to load dashboard:', err);
       }
@@ -2552,7 +2552,15 @@
 
       // 2. Active Booking Card / Green Scanned Banner / Pending Requests
       const activeContainer = document.getElementById('active-booking-container');
-      const allActive = data.active_reservations || data.active_bookings || [];
+      let allActive = data.active_reservations || data.active_bookings || [];
+      // Safety guarantee: Only active items (Booked, Pending_Permission, Scanned with end_time > now)
+      allActive = allActive.filter(b => {
+        if (!b || !b.status) return false;
+        if (['Booked', 'Pending_Permission', 'Scanned'].includes(b.status)) {
+          return !b.end_time || new Date(b.end_time) > now;
+        }
+        return false;
+      });
       const scannedList = allActive.filter(b => b.status === 'Scanned');
       const bookedList = allActive.filter(b => b.status === 'Booked');
       const pendingList = allActive.filter(b => b.status === 'Pending_Permission');
@@ -2977,7 +2985,7 @@
           loadStudentDashboard(),
           typeof loadLiveRoomStatus === 'function' ? loadLiveRoomStatus('student-live-status-container', true) : Promise.resolve(),
           typeof loadStudentDashboard === 'function' ? loadStudentDashboard() : Promise.resolve(),
-          typeof renderStudentHistory === 'function' && AppState.dashboardData ? renderStudentHistory(AppState.dashboardData.history_by_status || AppState.dashboardData.history || {}) : Promise.resolve()
+          typeof renderStudentHistory === 'function' && AppState.dashboardData ? renderStudentHistory(AppState.dashboardData.history || AppState.dashboardData.history_by_status || []) : Promise.resolve()
         ]);
       } catch (err) {
         console.error('Scan QR verification error:', err);
@@ -3032,7 +3040,7 @@
       document.querySelectorAll('#student-tab-history .nav-tab-btn').forEach(btn => btn.classList.remove('active'));
       event.target.classList.add('active');
       if (AppState.dashboardData) {
-        renderStudentHistory(AppState.dashboardData.history_by_status || AppState.dashboardData.history || {});
+        renderStudentHistory(AppState.dashboardData.history || AppState.dashboardData.history_by_status || []);
       }
     }
 
@@ -3056,6 +3064,16 @@
           items = history[AppState.historyFilter] || [];
         }
       }
+
+      // Safety guarantee: Exclude any active reservations (status in Booked/Pending_Permission/Scanned AND end_time in future)
+      const currentNow = new Date();
+      items = items.filter(item => {
+        if (!item || !item.status) return false;
+        if (['Booked', 'Pending_Permission', 'Scanned'].includes(item.status) && item.end_time && new Date(item.end_time) > currentNow) {
+          return false;
+        }
+        return true;
+      });
 
       if (items.length === 0) {
         container.innerHTML = `
