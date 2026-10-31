@@ -304,18 +304,19 @@ def get_user_dashboard(
         .all()
     )
 
-    # Active bookings: ALL of user's Booked, Pending_Permission, and Scanned reservations
-    active_statuses = [
-        ReservationStatus.BOOKED,
-        ReservationStatus.PENDING_PERMISSION,
-        ReservationStatus.SCANNED,
-    ]
+    # Active bookings:
+    # 1. Booked and Pending_Permission reservations
+    # 2. Scanned reservations whose end_time > now (remains on active dashboard until slot expires)
     active_bookings = [
         res for res in reservations
-        if res.status in active_statuses
+        if (
+            res.status in [ReservationStatus.BOOKED, ReservationStatus.PENDING_PERMISSION]
+            or (res.status == ReservationStatus.SCANNED and res.end_time > now)
+        )
     ]
 
     # Group full history by status
+    # Scanned reservations move to history only once the booking time slot has fully elapsed
     grouped_history = {
         ReservationStatus.PENDING_PERMISSION.value: [],
         ReservationStatus.BOOKED.value: [],
@@ -326,6 +327,9 @@ def get_user_dashboard(
 
     for res in reservations:
         status_key = res.status.value
+        # If Scanned and slot has not elapsed yet, it stays active on dashboard and does not move to history
+        if res.status == ReservationStatus.SCANNED and res.end_time > now:
+            continue
         if status_key in grouped_history:
             grouped_history[status_key].append(ReservationResponse.model_validate(res))
 
@@ -341,9 +345,12 @@ def get_user_dashboard(
         .all()
     )
 
+    validated_active = [ReservationResponse.model_validate(r) for r in active_bookings]
+
     return UserDashboardResponse(
         user=UserResponse.model_validate(current_user),
-        active_bookings=[ReservationResponse.model_validate(r) for r in active_bookings],
+        active_bookings=validated_active,
+        active_reservations=validated_active,
         history_by_status=grouped_history,
         standby_waitlists=[StandbyResponse.model_validate(w) for w in waitlists],
     )
