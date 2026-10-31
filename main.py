@@ -194,6 +194,9 @@ def health_check():
         "status": "online",
         "service": "AI Campus Resource Management API",
         "timestamp": get_ist_now().isoformat(),
+        "utc_now": datetime.utcnow().isoformat(),
+        "ist_now": get_ist_now().isoformat(),
+        "build": "build-2026-10-31-a",
         "version": "2.0.0",
     }
 
@@ -341,7 +344,7 @@ def get_user_dashboard(
     for res in reservations:
         if classify_reservation(res, now) == "ACTIVE":
             active_reservations.append(res)
-        else:
+        if classify_reservation(res, now) == "HISTORY" or res.status == ReservationStatus.SCANNED:
             history_reservations.append(res)
 
     # Group history: Remove 'Scanned' from any history-by-status list!

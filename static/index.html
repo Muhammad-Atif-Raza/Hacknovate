@@ -2981,12 +2981,10 @@
         });
 
         showToast('✅ Checked In! Status updated to Scanned.', 'success');
-        await Promise.all([
-          loadStudentDashboard(),
-          typeof loadLiveRoomStatus === 'function' ? loadLiveRoomStatus('student-live-status-container', true) : Promise.resolve(),
-          typeof loadStudentDashboard === 'function' ? loadStudentDashboard() : Promise.resolve(),
-          typeof renderStudentHistory === 'function' && AppState.dashboardData ? renderStudentHistory(AppState.dashboardData.history || AppState.dashboardData.history_by_status || []) : Promise.resolve()
-        ]);
+        switchStudentTab('history');
+        if (typeof loadLiveRoomStatus === 'function') {
+          loadLiveRoomStatus('student-live-status-container', true);
+        }
       } catch (err) {
         console.error('Scan QR verification error:', err);
         showToast(err.message || 'Check-in failed. Please verify with admin.', 'error');
