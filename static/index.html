@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Aggressive Cache Busting -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Campus Resource Hub | NIIT University</title>
   <!-- Google Fonts: Space Grotesk + Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2794,9 +2798,9 @@
                 ${res.is_urgent ? '<span class="pill-tag tag-rose" style="margin-left: 6px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🚨 URGENT</span>' : ''}
                 <h4 style="font-size: 1.15rem; margin-top: 0.35rem; color: var(--text-primary);">${roomTitle}</h4>
               </div>
-              <div style="text-align: right;">
+              <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem;">
                 <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.start_time)}</span>
-                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; margin-top: 0.4rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
                   ${res.status === 'Booked' ? `
                     <button class="btn-pill-dark" style="padding: 0.45rem 0.9rem; font-size: 0.82rem;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
                       📷 Open Camera to Scan Door QR
@@ -2806,8 +2810,8 @@
                       📷 Re-Verify Door QR
                     </button>
                   ` : ''}
-                  <button class="btn-pill-outline" style="padding: 0.38rem 0.85rem; font-size: 0.78rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.35);" onclick="handleCancelStudentBooking('${res.id}', '${roomTitle.replace(/'/g, "\\'")}')">
-                    ✕ Cancel Booking
+                  <button class="btn-pill-outline" style="padding: 0.45rem 0.95rem; font-size: 0.82rem; color: #dc2626; border: 1.5px solid #ef4444; background: rgba(239, 68, 68, 0.06); font-weight: 600; border-radius: 9999px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="handleCancelStudentBooking('${res.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                    ${res.status === 'Pending_Permission' ? '✕ Withdraw Request' : '✕ Cancel Booking'}
                   </button>
                 </div>
               </div>

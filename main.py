@@ -187,10 +187,10 @@ app.add_middleware(
 @app.middleware("http")
 async def add_cache_control_headers(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+    # Prevent stale browser caching across all HTML, JS, CSS, and API endpoints
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
 
 # Include Authentication Router
@@ -215,7 +215,7 @@ def health_check():
         "timestamp": get_ist_now().isoformat(),
         "utc_now": datetime.utcnow().isoformat(),
         "ist_now": get_ist_now().isoformat(),
-        "build": "build-2026-10-31-a",
+        "build": "build-2026-10-31-cancel-v2",
         "version": "2.0.0",
     }
 
@@ -225,7 +225,14 @@ def health_check():
 def serve_frontend():
     index_file = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
+        return FileResponse(
+            index_file,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return {"message": "Frontend index.html not found"}
 
 
