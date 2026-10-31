@@ -220,7 +220,7 @@ def health_check():
         "timestamp": get_ist_now().isoformat(),
         "utc_now": datetime.utcnow().isoformat(),
         "ist_now": get_ist_now().isoformat(),
-        "build": "build-2026-10-31-live-sync-v4",
+        "build": "build-2026-10-31-next-hour-radar-v5",
         "version": "2.0.0",
     }
 
@@ -249,14 +249,21 @@ def list_spaces(db: Session = Depends(get_db)):
 
 
 @app.get("/api/rooms/live-status", tags=["Spaces"])
-def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
+def get_rooms_live_status(
+    response: Response,
+    window: Optional[str] = Query("next_hour", description="Occupancy window: 'next_hour', 'now', or 'today'"),
+    db: Session = Depends(get_db),
+):
     """
-    Returns real-time occupancy status for all campus spaces.
-    Identifies whether each space is currently 'Vacant / Free' or 'Occupied / In-Use',
-    along with occupant and upcoming scheduled booking.
+    Real-time Live Radar Status:
+    Returns occupancy and reservation info evaluated for the next hour window, right now, and today.
     """
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+
     now = get_ist_now()
+    next_hour = now + timedelta(hours=1)
+    today_end = now.replace(hour=23, minute=59, second=59)
     spaces = db.query(Space).order_by(Space.name.asc()).all()
 
     active_statuses = [
@@ -266,8 +273,8 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
     ]
 
     result = []
-    today_end = now.replace(hour=23, minute=59, second=59)
     for s in spaces:
+        # Active right now (in physical session or in 15-min door check-in window)
         current_res = (
             db.query(Reservation)
             .options(joinedload(Reservation.user))
@@ -281,6 +288,21 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
             .first()
         )
 
+        # Active or starting within next 60 minutes
+        next_hour_res = (
+            db.query(Reservation)
+            .options(joinedload(Reservation.user))
+            .filter(
+                Reservation.space_id == s.id,
+                Reservation.status.in_(active_statuses),
+                Reservation.start_time < next_hour,
+                Reservation.end_time > now,
+            )
+            .order_by(Reservation.start_time.asc())
+            .first()
+        )
+
+        # Next upcoming reservation after now
         next_res = (
             db.query(Reservation)
             .options(joinedload(Reservation.user))
@@ -305,6 +327,18 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
                 "is_urgent": getattr(current_res, "is_urgent", False),
             }
 
+        next_hour_data = None
+        if next_hour_res:
+            next_hour_data = {
+                "id": str(next_hour_res.id),
+                "user_name": next_hour_res.user.name if next_hour_res.user else "Student",
+                "purpose": next_hour_res.purpose,
+                "start_time": next_hour_res.start_time.isoformat(),
+                "end_time": next_hour_res.end_time.isoformat(),
+                "status": next_hour_res.status.value,
+                "is_urgent": getattr(next_hour_res, "is_urgent", False),
+            }
+
         next_data = None
         if next_res:
             next_data = {
@@ -318,12 +352,22 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
             }
 
         is_in_use_now = (current_res is not None)
+        is_reserved_next_hour = (next_hour_res is not None)
         is_reserved_today = (
-            is_in_use_now or (next_res is not None and next_res.start_time <= today_end)
+            is_reserved_next_hour or (next_res is not None and next_res.start_time <= today_end)
         )
         has_upcoming = (next_res is not None)
 
-        status_str = "Occupied" if is_in_use_now else ("Reserved" if is_reserved_today else ("Upcoming" if has_upcoming else "Available"))
+        if is_in_use_now:
+            status_str = "Occupied"
+        elif is_reserved_next_hour:
+            status_str = "Reserved Next Hour"
+        elif is_reserved_today:
+            status_str = "Reserved Today"
+        elif has_upcoming:
+            status_str = "Upcoming"
+        else:
+            status_str = "Available"
 
         result.append({
             "id": str(s.id),
@@ -331,12 +375,19 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
             "capacity": s.capacity,
             "acoustic_profile": s.acoustic_profile.value,
             "is_occupied": is_in_use_now,
-            "is_reserved": is_reserved_today or has_upcoming,
+            "is_reserved_next_hour": is_reserved_next_hour,
+            "is_reserved": is_reserved_next_hour or is_reserved_today,
             "is_reserved_today": is_reserved_today,
             "has_upcoming": has_upcoming,
             "status": status_str,
             "current_reservation": curr_data,
+            "next_hour_reservation": next_hour_data,
             "next_reservation": next_data,
+            "window_info": {
+                "now": now.isoformat(),
+                "next_hour": next_hour.isoformat(),
+                "formatted": f"{now.strftime('%I:%M %p')} – {next_hour.strftime('%I:%M %p')}"
+            }
         })
 
     return result

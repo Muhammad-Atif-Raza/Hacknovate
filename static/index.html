@@ -3682,6 +3682,21 @@ async function handleCancelStudentBooking(resId, roomName) {
         .replace(/'/g, '&#039;');
     }
 
+    function formatTime(isoStr) {
+      if (!isoStr) return '';
+      const dtStr = formatDateTime(isoStr);
+      const parts = dtStr.split(', ');
+      return parts.length > 1 ? parts[1] : dtStr;
+    }
+
+    // Default time window for Live Room Status radar: 'next_hour'
+    window.activeLiveWindow = window.activeLiveWindow || 'next_hour';
+
+    function setLiveStatusWindow(windowKey, containerId, isStudentView) {
+      window.activeLiveWindow = windowKey;
+      loadLiveRoomStatus(containerId, isStudentView);
+    }
+
     // ALL ROOMS LIVE STATUS RADAR (STUDENT & ADMIN)
     // =====================================================================
     async function loadLiveRoomStatus(containerId, isStudentView = true) {
@@ -3690,7 +3705,7 @@ async function handleCancelStudentBooking(resId, roomName) {
       container.innerHTML = `
         <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
           <div style="font-size: 1.8rem; margin-bottom: 0.5rem;">⏳</div>
-          Loading real-time campus room occupancy...
+          Loading real-time campus room occupancy for the next hour...
         </div>
       `;
 
@@ -3698,45 +3713,88 @@ async function handleCancelStudentBooking(resId, roomName) {
         const rooms = await apiRequest('/api/rooms/live-status');
         window.liveStatusRooms = rooms;
         AppState.allSpaces = rooms;
+
+        const activeWindow = window.activeLiveWindow || 'next_hour';
         const total = rooms.length;
-        const occupied = rooms.filter(r => r.is_occupied).length;
-        const reserved = rooms.filter(r => !r.is_occupied && (r.is_reserved || r.is_reserved_today || r.next_reservation)).length;
-        const available = rooms.filter(r => !r.is_occupied && !r.is_reserved && !r.is_reserved_today && !r.next_reservation).length;
         const nowFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const windowInfo = (rooms[0] && rooms[0].window_info) ? rooms[0].window_info : null;
+        const nextHourFormatted = windowInfo ? windowInfo.formatted : 'Next 1 Hour';
+
+        // Categorize rooms based on selected window
+        let availableCount = 0;
+        let reservedCount = 0;
+        let occupiedCount = 0;
+
+        rooms.forEach(r => {
+          if (activeWindow === 'now') {
+            if (r.is_occupied) occupiedCount++;
+            else availableCount++;
+          } else if (activeWindow === 'today') {
+            if (r.is_occupied) occupiedCount++;
+            else if (r.is_reserved_today || r.is_reserved || r.next_reservation) reservedCount++;
+            else availableCount++;
+          } else { // 'next_hour' (Default requested by user)
+            if (r.is_occupied) occupiedCount++;
+            else if (r.is_reserved_next_hour) reservedCount++;
+            else availableCount++;
+          }
+        });
+
+        let windowBadgeLabel = `● REAL-TIME RADAR • NEXT 1 HOUR (${nextHourFormatted})`;
+        let windowSubtext = `Showing real-time room occupancy and reservations for the <strong>Next 1 Hour (${nextHourFormatted})</strong>. Refreshed at ${nowFormatted}.`;
+        if (activeWindow === 'now') {
+          windowBadgeLabel = `● REAL-TIME RADAR • RIGHT NOW`;
+          windowSubtext = `Showing real-time physical occupancy right now. Refreshed at ${nowFormatted}.`;
+        } else if (activeWindow === 'today') {
+          windowBadgeLabel = `● REAL-TIME RADAR • FULL DAY TODAY`;
+          windowSubtext = `Showing full-day reservation schedules and current occupancy. Refreshed at ${nowFormatted}.`;
+        }
 
         let html = `
           <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
             <div>
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.35rem;">
-                <span class="pill-tag tag-emerald">● REAL-TIME RADAR</span>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.35rem; flex-wrap: wrap;">
+                <span class="pill-tag tag-emerald">${windowBadgeLabel}</span>
                 <h2 style="font-size: 1.5rem; color: var(--text-primary); margin: 0;">Campus Facility Live Status</h2>
               </div>
-              <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">
-                Live room occupancy refreshed at ${nowFormatted}. See available rooms at a glance.
+              <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0 0 0.65rem 0;">
+                ${windowSubtext}
               </p>
+              <!-- Window Filter Switcher -->
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button type="button" class="btn-pill-dark" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; ${activeWindow === 'next_hour' ? 'background: #1f2937; color: #fff; font-weight: 700;' : 'background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); font-weight: 500;'}" onclick="setLiveStatusWindow('next_hour', '${containerId}', ${isStudentView})">
+                  ⚡ Next 1 Hour (${nextHourFormatted})
+                </button>
+                <button type="button" class="btn-pill-dark" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; ${activeWindow === 'now' ? 'background: #1f2937; color: #fff; font-weight: 700;' : 'background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); font-weight: 500;'}" onclick="setLiveStatusWindow('now', '${containerId}', ${isStudentView})">
+                  📍 Right Now
+                </button>
+                <button type="button" class="btn-pill-dark" style="font-size: 0.78rem; padding: 0.35rem 0.85rem; ${activeWindow === 'today' ? 'background: #1f2937; color: #fff; font-weight: 700;' : 'background: var(--surface); color: var(--text-primary); border: 1px solid var(--border); font-weight: 500;'}" onclick="setLiveStatusWindow('today', '${containerId}', ${isStudentView})">
+                  📅 Full Day Today
+                </button>
+              </div>
             </div>
             <button class="btn-pill-dark" onclick="loadLiveRoomStatus('${containerId}', ${isStudentView})" style="font-size: 0.82rem; padding: 0.45rem 1rem;">
               🔄 Refresh Status
             </button>
           </div>
 
-          <!-- Quick Metrics Counters -->
+          <!-- Quick Metrics Counters for Next Hour -->
           <div class="admin-stat-grid" style="margin-bottom: 1.75rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
             <div class="stat-card">
               <span>Total Campus Rooms</span>
               <h3>${total}</h3>
             </div>
             <div class="stat-card">
-              <span>🟢 Available All Day</span>
-              <h3 style="color: var(--accent-emerald);">${available}</h3>
+              <span>🟢 Free for ${activeWindow === 'next_hour' ? 'Next Hour' : (activeWindow === 'now' ? 'Now' : 'All Day')}</span>
+              <h3 style="color: var(--accent-emerald);">${availableCount}</h3>
             </div>
             <div class="stat-card">
-              <span>🟡 Reserved Today</span>
-              <h3 style="color: #d97706;">${reserved}</h3>
+              <span>🟡 Reserved ${activeWindow === 'next_hour' ? 'in Next Hour' : 'Today'}</span>
+              <h3 style="color: #d97706;">${reservedCount}</h3>
             </div>
             <div class="stat-card">
-              <span>🔴 In-Use Now</span>
-              <h3 style="color: var(--accent-rose);">${occupied}</h3>
+              <span>🔴 In-Use Right Now</span>
+              <h3 style="color: var(--accent-rose);">${occupiedCount}</h3>
             </div>
           </div>
 
@@ -3745,24 +3803,24 @@ async function handleCancelStudentBooking(resId, roomName) {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
               <div>
                 <h3 style="font-size: 1.15rem; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
-                  <span>🗺️ Campus Blueprint &bull; Interactive 2D Floor Plan</span>
+                  <span>🗺️ Campus Blueprint &bull; Interactive 2D Floor Plan (${activeWindow === 'next_hour' ? 'Next 1 Hour' : (activeWindow === 'now' ? 'Live Now' : 'Today')})</span>
                 </h3>
                 <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.2rem 0 0;">
-                  Live visual blueprint of campus room occupancy. Click any room to view details or select alternative slots.
+                  Color-coded for ${activeWindow === 'next_hour' ? `the next hour window (${nextHourFormatted})` : 'live room availability'}. Click any room for details or booking.
                 </p>
               </div>
               <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; font-weight: 600; flex-wrap: wrap;">
                 <span style="display: inline-flex; align-items: center; gap: 5px;">
                   <span style="width: 12px; height: 12px; border-radius: 3px; background: #dcfce7; border: 1.5px solid #15803d;"></span>
-                  Available All Day
+                  Free for Next Hr
                 </span>
                 <span style="display: inline-flex; align-items: center; gap: 5px;">
                   <span style="width: 12px; height: 12px; border-radius: 3px; background: #fef3c7; border: 1.5px solid #d97706;"></span>
-                  Reserved Today
+                  Reserved in Next Hr
                 </span>
                 <span style="display: inline-flex; align-items: center; gap: 5px;">
                   <span style="width: 12px; height: 12px; border-radius: 3px; background: #fee2e2; border: 1.5px solid #b91c1c;"></span>
-                  In Use / Occupied
+                  In Use Now
                 </span>
               </div>
             </div>
@@ -3790,11 +3848,22 @@ async function handleCancelStudentBooking(resId, roomName) {
                 ].map(cfg => {
                   const roomObj = rooms.find(r => r.name.toLowerCase().includes(cfg.key)) || rooms.find(r => r.name === cfg.name);
                   if (!roomObj) return '';
+
                   const isOcc = roomObj.is_occupied;
-                  const isRes = !isOcc && (roomObj.is_reserved || roomObj.is_reserved_today || roomObj.next_reservation);
+                  const isResNext = roomObj.is_reserved_next_hour;
+                  const isResToday = roomObj.is_reserved_today || roomObj.is_reserved || roomObj.next_reservation;
+                  
+                  let isRes = false;
+                  if (activeWindow === 'now') isRes = false;
+                  else if (activeWindow === 'today') isRes = (!isOcc && isResToday);
+                  else isRes = (!isOcc && isResNext);
+
+                  const nextResObj = roomObj.next_hour_reservation || roomObj.next_reservation;
+                  const startTimeStr = nextResObj ? formatTime(nextResObj.start_time) : '';
+
                   const fill = isOcc ? '#fee2e2' : (isRes ? '#fef3c7' : '#dcfce7');
                   const stroke = isOcc ? '#b91c1c' : (isRes ? '#d97706' : '#15803d');
-                  const badgeText = isOcc ? '🔴 In Use' : (isRes ? '🟡 Reserved' : '🟢 Free');
+                  const badgeText = isOcc ? '🔴 In Use' : (isRes ? (startTimeStr ? `🟡 Res ${startTimeStr}` : '🟡 Reserved') : '🟢 Free Next Hr');
                   const badgeFill = isOcc ? '#991b1b' : (isRes ? '#92400e' : '#15803d');
                   const badgeBg = isOcc ? '#fecaca' : (isRes ? '#fde68a' : '#bbf7d0');
                   const subText = `${roomObj.capacity} Seats • ${roomObj.acoustic_profile}`;
@@ -3804,8 +3873,8 @@ async function handleCancelStudentBooking(resId, roomName) {
                       <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" />
                       <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B">${roomObj.name}</text>
                       <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B">${subText}</text>
-                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="84" height="20" rx="10" fill="${badgeBg}" />
-                      <text x="${cfg.x + 56}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}">${badgeText}</text>
+                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="95" height="20" rx="10" fill="${badgeBg}" />
+                      <text x="${cfg.x + 61}" y="${cfg.y + 74}" text-anchor="middle" font-size="9" font-weight="700" fill="${badgeFill}">${badgeText}</text>
                     </g>
                   `;
                 }).join('')}
@@ -3817,7 +3886,14 @@ async function handleCancelStudentBooking(resId, roomName) {
           <div class="rooms-grid">
             ${rooms.map(room => {
               const isOcc = room.is_occupied;
-              const isRes = !isOcc && (room.is_reserved || room.is_reserved_today || room.next_reservation);
+              const isResNext = room.is_reserved_next_hour;
+              const isResToday = room.is_reserved_today || room.is_reserved || room.next_reservation;
+              
+              let isRes = false;
+              if (activeWindow === 'now') isRes = false;
+              else if (activeWindow === 'today') isRes = (!isOcc && isResToday);
+              else isRes = (!isOcc && isResNext);
+
               let acousticTag = 'tag-neutral';
               if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
               if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
@@ -3827,15 +3903,18 @@ async function handleCancelStudentBooking(resId, roomName) {
                 ? '1.5px solid #ef4444'
                 : (isRes ? '1.5px solid #f59e0b' : '1.5px solid #10b981');
 
+              const nextResObj = room.next_hour_reservation || room.next_reservation;
+              const startTimeStr = nextResObj ? formatTime(nextResObj.start_time) : '';
+
               const statusBadge = isOcc
-                ? '<span class="pill-tag tag-rose" style="font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🔴 OCCUPIED / IN USE</span>'
+                ? '<span class="pill-tag tag-rose" style="font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🔴 OCCUPIED / IN USE NOW</span>'
                 : (isRes
-                    ? '<span class="pill-tag tag-amber" style="font-weight: 700; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b;">🟡 RESERVED TODAY</span>'
-                    : '<span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 FREE / AVAILABLE ALL DAY</span>'
+                    ? `<span class="pill-tag tag-amber" style="font-weight: 700; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b;">🟡 RESERVED IN NEXT HOUR (${startTimeStr || 'Upcoming'})</span>`
+                    : '<span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 FREE FOR NEXT 1 HOUR</span>'
                   );
 
               const currentRes = room.current_reservation;
-              const nextRes = room.next_reservation;
+              const relevantRes = nextResObj;
 
               return `
                 <div class="room-card" style="border: ${cardBorder}; display: flex; flex-direction: column; justify-content: space-between;">
@@ -3861,29 +3940,29 @@ async function handleCancelStudentBooking(resId, roomName) {
                           🎯 "${escapeHtml(currentRes.purpose)}"
                         </div>
                         <div style="color: #991b1b; font-size: 0.78rem;">
-                          🕒 Free at: <strong>${formatDateTime(currentRes.end_time)}</strong>
+                          🕒 In session until: <strong>${formatDateTime(currentRes.end_time)}</strong>
                         </div>
                       </div>
-                    ` : (isRes && nextRes ? `
+                    ` : (isRes && relevantRes ? `
                       <div style="background: rgba(245, 158, 11, 0.09); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem; border-left: 3px solid #f59e0b;">
                         <div style="color: #92400e; font-weight: 700; margin-bottom: 0.2rem;">
-                          📅 Scheduled: ${escapeHtml(nextRes.user_name)}
-                          ${nextRes.is_urgent ? '<span class="pill-tag tag-rose" style="font-size: 0.7rem; margin-left: 4px;">🚨 URGENT</span>' : ''}
+                          📅 Scheduled: ${escapeHtml(relevantRes.user_name)}
+                          ${relevantRes.is_urgent ? '<span class="pill-tag tag-rose" style="font-size: 0.7rem; margin-left: 4px;">🚨 URGENT</span>' : ''}
                         </div>
                         <div style="color: #78350f; margin-bottom: 0.2rem;">
-                          🎯 "${escapeHtml(nextRes.purpose)}"
+                          🎯 "${escapeHtml(relevantRes.purpose)}"
                         </div>
                         <div style="color: #92400e; font-size: 0.78rem;">
-                          🕒 Reserved slot: <strong>${formatDateTime(nextRes.start_time)} - ${formatDateTime(nextRes.end_time)}</strong>
+                          🕒 Reserved slot: <strong>${formatDateTime(relevantRes.start_time)} - ${formatDateTime(relevantRes.end_time)}</strong>
                         </div>
                       </div>
                     ` : `
                       <div style="background: rgba(16, 185, 129, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem; border-left: 3px solid #10b981;">
                         <div style="color: #065f46; font-weight: 600; margin-bottom: 0.2rem;">
-                          ✨ Unoccupied and ready for instant booking.
+                          ✨ Unoccupied and ready for booking.
                         </div>
                         <div style="color: #047857; font-size: 0.78rem;">
-                          No upcoming bookings scheduled for today.
+                          No conflicting bookings during ${nextHourFormatted}.
                         </div>
                       </div>
                     `)}
@@ -3900,8 +3979,8 @@ async function handleCancelStudentBooking(resId, roomName) {
                           ⚡ Check Other Available Time Slots &rarr;
                         </button>
                       ` : `
-                        <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='quickBookSpaceFromLive(${JSON.stringify(room)})'>
-                          ⚡ Quick Book This Space &rarr;
+                        <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='quickBookSpaceForNextHour(${JSON.stringify(room)})'>
+                          ⚡ Quick Book Next Hour &rarr;
                         </button>
                       `)
                     ) : `
@@ -3927,32 +4006,21 @@ async function handleCancelStudentBooking(resId, roomName) {
       }
     }
 
-    window.handleFloorPlanRoomClick = function(roomId) {
-      const rooms = window.liveStatusRooms || AppState.allSpaces || [];
-      const room = rooms.find(s => String(s.id).toLowerCase() === String(roomId).toLowerCase());
-      if (!room) return;
-
-      if (room.is_occupied) {
-        const currentRes = room.current_reservation;
-        if (currentRes && currentRes.status === 'Scanned') {
-          showToast(`"${room.name}" is physically checked into and cannot be overridden.`, 'info');
-          return;
-        }
-        showToast(`"${room.name}" is currently in session. Switch to Search to view alternative slots.`, 'info');
+    function quickBookSpaceForNextHour(room) {
+      if (room.is_occupied || room.is_reserved_next_hour) {
+        const res = room.next_hour_reservation || room.next_reservation;
+        const timeMsg = res ? ` at ${formatTime(res.start_time)}` : '';
+        showToast(`"${room.name}" has a scheduled reservation${timeMsg}. Please search for an open time slot.`, 'info');
         switchStudentTab('search');
         return;
       }
 
-      if (room.is_reserved || room.is_reserved_today || room.next_reservation) {
-        showToast(`"${room.name}" is reserved today. Please choose an open slot on the Search tab.`, 'info');
-        switchStudentTab('search');
-        return;
-      }
-
-      // Populate default start/end times (Now + 5 mins to Now + 65 mins) and capacity = 1
       const now = new Date();
-      const start = new Date(now.getTime() + 5 * 60000);
-      const end = new Date(now.getTime() + 65 * 60000);
+      // Round to next 5 minutes
+      const rem = 5 - (now.getMinutes() % 5);
+      const start = new Date(now.getTime() + rem * 60000);
+      const end = new Date(start.getTime() + 60 * 60000);
+
       const startIso = toLocalISOString(start);
       const endIso = toLocalISOString(end);
 
@@ -3971,6 +4039,35 @@ async function handleCancelStudentBooking(resId, roomName) {
       };
 
       openBookingModal(room, false);
+    }
+
+    const quickBookSpaceFromLive = quickBookSpaceForNextHour;
+
+    window.handleFloorPlanRoomClick = function(roomId) {
+      const rooms = window.liveStatusRooms || AppState.allSpaces || [];
+      const room = rooms.find(s => String(s.id).toLowerCase() === String(roomId).toLowerCase());
+      if (!room) return;
+
+      if (room.is_occupied) {
+        const currentRes = room.current_reservation;
+        if (currentRes && currentRes.status === 'Scanned') {
+          showToast(`"${room.name}" is physically checked into and cannot be overridden.`, 'info');
+          return;
+        }
+        showToast(`"${room.name}" is currently in session. Switch to Search to view alternative slots.`, 'info');
+        switchStudentTab('search');
+        return;
+      }
+
+      if (room.is_reserved_next_hour) {
+        const res = room.next_hour_reservation || room.next_reservation;
+        const timeStr = res ? ` at ${formatTime(res.start_time)}` : '';
+        showToast(`"${room.name}" is reserved${timeStr} in the next hour. Please select an open slot on Search.`, 'info');
+        switchStudentTab('search');
+        return;
+      }
+
+      quickBookSpaceForNextHour(room);
     };
 
     function openOccupiedRoomModal(room) {
@@ -3987,22 +4084,6 @@ async function handleCancelStudentBooking(resId, roomName) {
           joinStandbyWaitlist(room.id);
         }
       }
-    }
-
-    function quickBookSpaceFromLive(room) {
-      if (room.is_occupied || room.is_reserved || room.is_reserved_today || room.next_reservation) {
-        showToast(`"${room.name}" has scheduled reservations today. Please search for an open time slot.`, 'info');
-        switchStudentTab('search');
-        return;
-      }
-      initializeDateTimeInputs();
-      AppState.searchParams = {
-        startTime: document.getElementById('search-start').value,
-        endTime: document.getElementById('search-end').value,
-        capacity: 1,
-        acousticProfile: room.acoustic_profile
-      };
-      openBookingModal(room);
     }
 
     async function handleScannedRoomCheckin(spaceId) {
