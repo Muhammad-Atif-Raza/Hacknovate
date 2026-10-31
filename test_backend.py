@@ -286,6 +286,35 @@ def run_all_tests():
     assert resp.status_code == 400
     print("[OK] Capacity Validation: Over-capacity booking request rejected with 400 Bad Request.")
 
+    # Student Self-Cancellation Test
+    cancel_test_start = (now + timedelta(days=6)).replace(hour=14, minute=0, second=0, microsecond=0).isoformat()
+    cancel_test_end = (now + timedelta(days=6)).replace(hour=16, minute=0, second=0, microsecond=0).isoformat()
+    resp = client.post(
+        "/api/bookings",
+        headers=student_headers,
+        json={
+            "space_id": free_space["id"],
+            "start_time": cancel_test_start,
+            "end_time": cancel_test_end,
+            "accompanying_count": 0,
+            "purpose": "Cancellation Flow Test",
+        },
+    )
+    assert resp.status_code == 201
+    cancel_b_id = resp.json()["id"]
+
+    # Student cancels their own booking
+    resp = client.post(f"/api/bookings/{cancel_b_id}/cancel", headers=student_headers)
+    assert resp.status_code == 200, f"Cancel booking failed: {resp.text}"
+    cancelled_data = resp.json()
+    assert cancelled_data["status"] == "Denied"
+    print("[OK] Student Self-Cancellation: Successfully cancelled own active reservation from dashboard.")
+
+    # Re-cancelling already cancelled booking should return 400 Bad Request
+    resp = client.post(f"/api/bookings/{cancel_b_id}/cancel", headers=student_headers)
+    assert resp.status_code == 400
+    print("[OK] Duplicate Cancellation Protection: Correctly returned 400 Bad Request.")
+
     # -------------------------------------------------------------
     # 6. Admin Portal: Pending Requests & Decisions
     # -------------------------------------------------------------

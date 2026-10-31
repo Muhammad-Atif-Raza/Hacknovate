@@ -734,6 +734,80 @@ def scan_qr_checkin(
     )
 
 
+@app.post("/api/bookings/{booking_id}/cancel", response_model=ReservationResponse, tags=["Student Portal"])
+@app.delete("/api/bookings/{booking_id}", response_model=ReservationResponse, tags=["Student Portal"])
+def cancel_student_booking(
+    booking_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Allows a student (or admin) to cancel an active or pending reservation directly from their dashboard.
+    - Releases room immediately so other students / standby waitlists can claim it.
+    - If status was Booked or Scanned, decrements student total_bookings.
+    - If reservation was Urgent, refunds the student's monthly urgency quota.
+    - Automatically checks and triggers 3-minute standby rotation if waitlisted students exist.
+    """
+    reservation = db.query(Reservation).filter(Reservation.id == booking_id).first()
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found",
+        )
+
+    # Permission check: must be owner or admin
+    if reservation.user_id != current_user.id and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to cancel this reservation",
+        )
+
+    # State check: cannot cancel already expired or denied
+    if reservation.status not in (
+        ReservationStatus.PENDING_PERMISSION,
+        ReservationStatus.BOOKED,
+        ReservationStatus.SCANNED,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Reservation is already in '{reservation.status.value}' state and cannot be cancelled",
+        )
+
+    # Decrement student total_bookings if already approved/scanned
+    student = db.query(User).filter(User.id == reservation.user_id).first()
+    if reservation.status in (ReservationStatus.BOOKED, ReservationStatus.SCANNED):
+        if student and student.total_bookings > 0:
+            student.total_bookings -= 1
+
+    # Refund monthly urgency quota if urgent
+    if reservation.is_urgent:
+        if student and student.urgent_requests_used > 0:
+            student.urgent_requests_used -= 1
+
+    # Update status to Denied (cancelled)
+    reservation.status = ReservationStatus.DENIED
+    now = get_ist_now()
+
+    # Trigger standby waitlist rotation for the released slot
+    try:
+        from background_tasks import activate_standby_for_slot
+        activate_standby_for_slot(
+            db=db,
+            space_id=reservation.space_id,
+            slot_start=reservation.start_time,
+            slot_end=reservation.end_time,
+            now=now,
+        )
+    except Exception as e:
+        logger.warning(f"Standby rotation trigger warning on cancel: {e}")
+
+    db.commit()
+    db.refresh(reservation)
+
+    logger.info(f"Reservation {reservation.id} successfully cancelled by user {current_user.id}.")
+    return reservation
+
+
 @app.post("/api/standby/join", response_model=StandbyResponse, status_code=status.HTTP_201_CREATED, tags=["Student Portal"])
 def join_standby_waitlist(
     payload: StandbyJoinRequest,

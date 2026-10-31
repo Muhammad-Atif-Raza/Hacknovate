@@ -2659,6 +2659,9 @@
               <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #059669;" onclick="openCameraScanner('${scannedRes.id}', '${scannedRes.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
                 📷 Scan Door QR / Hourly Re-Verify
               </button>
+              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${scannedRes.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                ✕ Cancel Booking
+              </button>
             </div>
           </div>
         `;
@@ -2699,6 +2702,9 @@
               <button class="btn-pill-dark" style="width: 100%; padding: 0.8rem 1.25rem; font-size: 0.92rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px;" onclick="openCameraScanner('${bookedRes.id}', '${bookedRes.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
                 📷 Open Camera to Scan Door QR
               </button>
+              <button class="btn-pill-outline" style="width: 100%; padding: 0.6rem 1rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${bookedRes.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                ✕ Cancel Booking
+              </button>
             </div>
           </div>
         `;
@@ -2722,6 +2728,11 @@
               <p style="color: #92400e; font-size: 0.85rem; background: rgba(245, 158, 11, 0.1); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #fde68a;">
                 ℹ️ This urgent override request is currently under review by Faculty and Administrators. Physical Door QR check-in will be enabled automatically as soon as approval is granted.
               </p>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 200px;">
+              <button class="btn-pill-outline" style="padding: 0.65rem 1.25rem; font-size: 0.88rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleCancelStudentBooking('${pendingRes.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                ✕ Withdraw Request
+              </button>
             </div>
           </div>
         `;
@@ -2785,19 +2796,20 @@
               </div>
               <div style="text-align: right;">
                 <span style="font-size: 0.85rem; color: var(--text-muted);">${formatDateTime(res.start_time)}</span>
-                ${res.status === 'Booked' ? `
-                  <div style="margin-top: 0.4rem;">
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; margin-top: 0.4rem;">
+                  ${res.status === 'Booked' ? `
                     <button class="btn-pill-dark" style="padding: 0.45rem 0.9rem; font-size: 0.82rem;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
                       📷 Open Camera to Scan Door QR
                     </button>
-                  </div>
-                ` : res.status === 'Scanned' ? `
-                  <div style="margin-top: 0.4rem;">
+                  ` : res.status === 'Scanned' ? `
                     <button class="btn-pill-dark" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; background: #059669;" onclick="openCameraScanner('${res.id}', '${res.space_id}', '${roomTitle.replace(/'/g, "\\'")}')">
                       📷 Re-Verify Door QR
                     </button>
-                  </div>
-                ` : ''}
+                  ` : ''}
+                  <button class="btn-pill-outline" style="padding: 0.38rem 0.85rem; font-size: 0.78rem; color: #dc2626; border-color: rgba(220, 38, 38, 0.35);" onclick="handleCancelStudentBooking('${res.id}', '${roomTitle.replace(/'/g, "\\'")}')">
+                    ✕ Cancel Booking
+                  </button>
+                </div>
               </div>
             </div>
             <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
@@ -2821,6 +2833,23 @@
         loadStudentDashboard();
       } catch (err) {
         console.error('Flash claim error:', err);
+      }
+    }
+
+async function handleCancelStudentBooking(resId, roomName) {
+      if (!confirm(`Are you sure you want to cancel your reservation for ${roomName || 'this room'}?`)) {
+        return;
+      }
+      try {
+        await apiRequest(`/api/bookings/${resId}/cancel`, { method: 'POST' });
+        showToast(`Reservation for ${roomName || 'room'} successfully cancelled.`, 'info');
+        await loadStudentDashboard();
+        if (typeof loadLiveRoomStatus === 'function') {
+          loadLiveRoomStatus('student-live-status-container', true);
+        }
+      } catch (err) {
+        console.error('Cancel booking error:', err);
+        showToast(err.message || 'Failed to cancel reservation.', 'error');
       }
     }
 
