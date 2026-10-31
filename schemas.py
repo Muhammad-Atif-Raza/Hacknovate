@@ -195,10 +195,21 @@ class StandbyResponse(BaseModel):
 # ==========================================
 class GoogleAuthRequest(BaseModel):
     id_token: Optional[str] = None
+    access_token: Optional[str] = None
     dev_bypass_email: Optional[str] = None
     dev_role: UserRole = UserRole.STUDENT
     name: Optional[str] = None
     photo_url: Optional[str] = None
+
+
+class AuthConfigResponse(BaseModel):
+    google_client_id: str = ""
+    hosted_domain: str = "st.niituniversity.in"
+    has_client_id: bool = False
+
+
+class UpdateGoogleConfig(BaseModel):
+    google_client_id: str
 
 
 class AuthResponse(BaseModel):

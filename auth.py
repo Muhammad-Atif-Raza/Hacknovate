@@ -11,9 +11,26 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, UserRole
-from schemas import GoogleAuthRequest, AuthResponse, UserResponse
+from schemas import GoogleAuthRequest, AuthResponse, UserResponse, AuthConfigResponse, UpdateGoogleConfig
 
 logger = logging.getLogger(__name__)
+
+# Auto-load .env configuration if present
+_env_file = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(_env_file):
+    try:
+        with open(_env_file, "r", encoding="utf-8") as _ef:
+            for _line in _ef:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    _k = _k.strip()
+                    _v = _v.strip().strip('"').strip("'")
+                    if _k and _k not in os.environ:
+                        os.environ[_k] = _v
+    except Exception as _e:
+        logger.warning(f"Error loading .env file: {_e}")
+
 
 # JWT Configuration
 JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-campus-resource-key-hackathon-2026")
@@ -125,20 +142,13 @@ def authenticate_google(
     name: Optional[str] = None
     photo_url: Optional[str] = None
 
-    # Dev Bypass Path (Hackathon friendly)
-    if payload.dev_bypass_email:
-        email = payload.dev_bypass_email.strip().lower()
-        name = payload.name or email.split("@")[0].replace(".", " ").title()
-        photo_url = (
-            payload.photo_url
-            or f"https://api.dicebear.com/7.x/bottts/svg?seed={email}"
-        )
-    elif payload.id_token:
-        # Live Google OAuth Verification
+    # 1. Google OAuth via Access Token (OAuth2 UserInfo)
+    if payload.access_token:
         try:
             google_resp = requests.get(
-                f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.id_token}",
-                timeout=5,
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {payload.access_token}"},
+                timeout=6,
             )
             if google_resp.status_code == 200:
                 google_data = google_resp.json()
@@ -146,19 +156,71 @@ def authenticate_google(
                 name = google_data.get("name") or email.split("@")[0].title()
                 photo_url = google_data.get("picture")
             else:
-                # Fallback for mock tokens in local sandbox
-                logger.warning("Google Token verification failed, checking payload fallback")
-                raise ValueError("Invalid Google ID token")
+                logger.warning(f"Google UserInfo API returned {google_resp.status_code}: {google_resp.text}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired Google OAuth access token",
+                )
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.warning(f"Token verification network error: {e}. Fallback enabled.")
-            # For offline/test resilience:
-            email = (payload.dev_bypass_email or f"user_{uuid.uuid4().hex[:6]}@campus.edu").lower()
-            name = payload.name or "Campus User"
-            photo_url = payload.photo_url or f"https://api.dicebear.com/7.x/bottts/svg?seed={email}"
+            logger.error(f"Google access token verification error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Google authentication service error: {e}",
+            )
+
+    # 2. Google OAuth via ID Token (JWT TokenInfo)
+    elif payload.id_token:
+        try:
+            google_resp = requests.get(
+                f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.id_token}",
+                timeout=6,
+            )
+            if google_resp.status_code == 200:
+                google_data = google_resp.json()
+                email = google_data.get("email", "").strip().lower()
+                name = google_data.get("name") or email.split("@")[0].title()
+                photo_url = google_data.get("picture")
+            else:
+                # In case Google API responds with error or offline testing, attempt unverified JWT claims decode
+                try:
+                    claims = jwt.decode(payload.id_token, options={"verify_signature": False})
+                    email = claims.get("email", "").strip().lower()
+                    name = claims.get("name") or (email.split("@")[0].title() if email else None)
+                    photo_url = claims.get("picture")
+                except Exception:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid Google OAuth ID token",
+                    )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Token verification network warning: {e}. Checking unverified JWT claims.")
+            try:
+                claims = jwt.decode(payload.id_token, options={"verify_signature": False})
+                email = claims.get("email", "").strip().lower()
+                name = claims.get("name") or (email.split("@")[0].title() if email else None)
+                photo_url = claims.get("picture")
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=f"Google token verification failed: {e}",
+                )
+
+    # 3. Development / Sandbox Bypass Path
+    elif payload.dev_bypass_email:
+        email = payload.dev_bypass_email.strip().lower()
+        name = payload.name or email.split("@")[0].replace(".", " ").title()
+        photo_url = (
+            payload.photo_url
+            or f"https://api.dicebear.com/7.x/bottts/svg?seed={email}"
+        )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Either id_token or dev_bypass_email must be provided",
+            detail="Either id_token, access_token, or dev_bypass_email must be provided",
         )
 
     if not email:
@@ -244,3 +306,37 @@ def authenticate_google(
 def logout():
     """Sign-out endpoint for client UI session clearing."""
     return {"message": "Successfully logged out. Please clear your access token from client storage."}
+
+
+@auth_router.get("/config", response_model=AuthConfigResponse)
+def get_auth_config():
+    """Returns the active Google OAuth client configuration."""
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    return AuthConfigResponse(
+        google_client_id=client_id,
+        hosted_domain="st.niituniversity.in",
+        has_client_id=bool(client_id),
+    )
+
+
+@auth_router.post("/config")
+def update_auth_config(payload: UpdateGoogleConfig):
+    """Dynamically updates or configures the Google OAuth Client ID."""
+    client_id = payload.google_client_id.strip()
+    os.environ["GOOGLE_CLIENT_ID"] = client_id
+
+    # Persist to local .env
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    lines = []
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = [l for l in f.readlines() if not l.startswith("GOOGLE_CLIENT_ID=")]
+    lines.append(f"GOOGLE_CLIENT_ID={client_id}\n")
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+    return {
+        "message": "Google Client ID updated successfully",
+        "google_client_id": client_id,
+        "has_client_id": bool(client_id),
+    }

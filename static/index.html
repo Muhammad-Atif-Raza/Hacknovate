@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Google Identity Services (GSI) OAuth SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer onload="if(typeof initGoogleOAuth==='function') initGoogleOAuth();"></script>
   <!-- HTML5 QR Camera Scanner CDN -->
   <script src="https://unpkg.com/html5-qrcode"></script>
   
@@ -980,7 +982,7 @@
 
     <div id="header-auth-container" class="header-nav">
       <!-- Public State -->
-      <button id="btn-public-login" class="btn-google-pill" onclick="openGoogleModal()">
+      <button id="btn-public-login" class="btn-google-pill" onclick="openGoogleSignIn()">
         <svg width="18" height="18" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
           <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -1028,10 +1030,10 @@
         Eliminate informal WhatsApp requests and paper registers. Experience conflict-free digital room bookings, acoustic category indexing, QR attendance validation, and dynamic standby reassignment.
       </p>
       <div class="hero-cta-group">
-        <button class="btn-pill-dark" onclick="openGoogleModal()" style="font-size: 1rem; padding: 0.85rem 2rem;">
+        <button class="btn-pill-dark" onclick="openGoogleSignIn()" style="font-size: 1rem; padding: 0.85rem 2rem;">
           Book a Room Now <span>&rarr;</span>
         </button>
-        <button class="btn-pill-outline" onclick="openGoogleModal()" style="font-size: 1rem; padding: 0.8rem 1.85rem;">
+        <button class="btn-pill-outline" onclick="openGoogleSignIn()" style="font-size: 1rem; padding: 0.8rem 1.85rem;">
           Portal Sign In
         </button>
       </div>
@@ -1384,6 +1386,9 @@
         <p style="font-size: 0.88rem; color: var(--text-secondary);">to continue to niituniversity.in</p>
       </div>
 
+      <!-- Real Official Google Sign-In Button Container (rendered via Google Identity Services) -->
+      <div id="g_id_signin_official" style="display: flex; justify-content: center; margin-bottom: 1.25rem;"></div>
+
       <!-- Google OAuth Accounts -->
       <div id="google-accounts-list">
         <!-- Student Account: Agrim Goel -->
@@ -1432,6 +1437,26 @@
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
             </svg>
             Continue with Google
+          </button>
+        </div>
+      </div>
+
+      <!-- Google Cloud Client ID Configuration Toggle (collapsible) -->
+      <div style="margin-top: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; text-align: center;">
+        <button type="button" class="btn-pill-outline" style="font-size: 0.78rem; padding: 0.35rem 0.85rem;" onclick="toggleGoogleConfigBox()">
+          ⚙️ Google OAuth Client ID Settings
+        </button>
+        <div id="google-config-box" style="display: none; text-align: left; background: var(--surface); padding: 1rem; border-radius: 12px; margin-top: 0.75rem; border: 1px solid var(--border);">
+          <label for="google-client-id-input" style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.35rem;">
+            Google Cloud OAuth Client ID (Web Application)
+          </label>
+          <input type="text" id="google-client-id-input" class="input-field" placeholder="e.g. 1234567890-xxx.apps.googleusercontent.com" style="margin-bottom: 0.5rem; font-size: 0.82rem;">
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.35;">
+            Authorized JavaScript Origin: <code id="cfg-current-origin" style="background: rgba(0,0,0,0.06); padding: 2px 5px; border-radius: 4px;"></code><br>
+            Hosted Domain: <strong>st.niituniversity.in</strong>
+          </div>
+          <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.5rem;" onclick="saveGoogleClientId()">
+            Save & Connect Google OAuth
           </button>
         </div>
       </div>
@@ -1808,19 +1833,34 @@
     }
 
     // =====================================================================
-    // AUTHENTICATION & NAVIGATION
+    // AUTHENTICATION & NAVIGATION (REAL GOOGLE OAUTH + UNIVERSITY SSO)
     // =====================================================================
+    let activeGoogleClientId = '';
+    let googleTokenClient = null;
+    let googleAuthInitialized = false;
+
     function openGoogleModal() {
       document.getElementById('google-modal').classList.add('open');
+      const originEl = document.getElementById('cfg-current-origin');
+      if (originEl) originEl.textContent = window.location.origin;
     }
 
     function closeGoogleModal() {
       document.getElementById('google-modal').classList.remove('open');
     }
 
+    function toggleGoogleConfigBox() {
+      const box = document.getElementById('google-config-box');
+      if (box) {
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        const originEl = document.getElementById('cfg-current-origin');
+        if (originEl) originEl.textContent = window.location.origin;
+      }
+    }
+
     function toggleCustomEmailInput() {
       const box = document.getElementById('custom-account-box');
-      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+      if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
     }
 
     function handleModalOverlayClick(event, modalId) {
@@ -1829,11 +1869,105 @@
       }
     }
 
+    /**
+     * Primary entrypoint for 'Sign in with Google' buttons:
+     * If Google Client ID is configured, directly opens Google's OAuth popup
+     * with hosted_domain: 'st.niituniversity.in' (matching the official prompt).
+     * Otherwise opens the modal allowing Client ID setup or direct test login.
+     */
+    function openGoogleSignIn() {
+      if (activeGoogleClientId && window.google && window.google.accounts) {
+        if (googleTokenClient) {
+          try {
+            googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+            return;
+          } catch (e) {
+            console.warn('OAuth popup launch failed:', e);
+          }
+        }
+        if (google.accounts.id) {
+          try {
+            google.accounts.id.prompt((notification) => {
+              if (notification.isNotDisplayed() || notification.isSkippedMomentum()) {
+                openGoogleModal();
+              }
+            });
+            return;
+          } catch (e) {
+            console.warn('Google One Tap prompt failed:', e);
+          }
+        }
+      }
+      openGoogleModal();
+    }
+
+    /**
+     * Handles Google Identity Services ID Token credential callback
+     */
+    async function handleGoogleCredentialResponse(response) {
+      try {
+        if (!response || !response.credential) {
+          throw new Error('No credential received from Google Identity Services.');
+        }
+        const res = await apiRequest('/api/auth/google', {
+          method: 'POST',
+          body: JSON.stringify({ id_token: response.credential })
+        });
+        completeAuthSuccess(res);
+      } catch (err) {
+        console.error('Google ID Token auth failed:', err);
+        showToast(err.message || 'Google sign-in verification failed.', 'error');
+      }
+    }
+
+    /**
+     * Handles Google OAuth2 Access Token callback
+     */
+    async function handleGoogleTokenResponse(tokenResponse) {
+      try {
+        if (!tokenResponse || !tokenResponse.access_token) {
+          throw new Error('Google OAuth token authorization was not completed.');
+        }
+        const res = await apiRequest('/api/auth/google', {
+          method: 'POST',
+          body: JSON.stringify({ access_token: tokenResponse.access_token })
+        });
+        completeAuthSuccess(res);
+      } catch (err) {
+        console.error('Google Access Token auth failed:', err);
+        showToast(err.message || 'Google OAuth authentication failed.', 'error');
+      }
+    }
+
+    /**
+     * Completes successful login: updates session, storage, UI state and routes
+     */
+    function completeAuthSuccess(res) {
+      AppState.token = res.access_token;
+      AppState.user = res.user;
+      localStorage.setItem('access_token', res.access_token);
+      localStorage.setItem('user_data', JSON.stringify(res.user));
+
+      closeGoogleModal();
+      const portalLabel = res.user.role === 'admin' ? "Admin's Panel" : "Student Portal";
+      showToast(`Welcome, ${res.user.name || 'Campus User'}! Signed into ${portalLabel}.`, 'success');
+
+      if (res.user.role === 'admin') {
+        switchAdminPanel('overview');
+      } else {
+        switchStudentTab('search');
+      }
+      syncUIState();
+    }
+
+    /**
+     * Direct University Account login (Development / Sandbox mode)
+     */
     async function loginWithGoogle(email, role, displayName) {
       try {
         const emailLower = email.trim().toLowerCase();
         let detectedRole = role;
-        if (emailLower.includes('.fac@') || emailLower.endsWith('.fac@st.niituniversity.in') || emailLower === 'admin@campus.edu') {
+        if (emailLower === 'tanmay.singh26@st.niituniversity.in' || emailLower.includes('.fac@') || emailLower === 'admin@campus.edu') {
           detectedRole = 'admin';
         } else if (emailLower.endsWith('@st.niituniversity.in')) {
           detectedRole = 'student';
@@ -1849,22 +1983,7 @@
           body: JSON.stringify(payload)
         });
 
-        AppState.token = res.access_token;
-        AppState.user = res.user;
-        localStorage.setItem('access_token', res.access_token);
-        localStorage.setItem('user_data', JSON.stringify(res.user));
-
-        closeGoogleModal();
-        const portalLabel = res.user.role === 'admin' ? "Admin's Panel" : "Student Portal";
-        showToast(`Welcome, ${res.user.name || displayName}! Signed into ${portalLabel}.`, 'success');
-        
-        // Initial tab after login: .fac@ -> Admin's panel, @st.niituniversity.in -> Student portal
-        if (res.user.role === 'admin') {
-          switchAdminPanel('overview');
-        } else {
-          switchStudentTab('search');
-        }
-        syncUIState();
+        completeAuthSuccess(res);
       } catch (err) {
         console.error('Google Sign-In failed:', err);
         showToast(err.message || 'Google sign-in failed. Please try again.', 'error');
@@ -1878,7 +1997,7 @@
         showToast('Please enter your university Google email address.', 'error');
         return;
       }
-      
+
       const emailLower = email.toLowerCase();
       if (!emailLower.endsWith('@st.niituniversity.in') && !emailLower.endsWith('@niituniversity.in') && emailLower !== 'admin@campus.edu') {
         showToast('Access Restricted: Only @st.niituniversity.in accounts are permitted.', 'error');
@@ -1891,6 +2010,91 @@
       }
 
       loginWithGoogle(email, role, email.split('@')[0].replace('.', ' '));
+    }
+
+    /**
+     * Initializes Google Identity Services (GSI) and Google OAuth2 Token Client
+     */
+    async function initGoogleOAuth() {
+      try {
+        const cfg = await apiRequest('/api/auth/config').catch(() => null);
+        const serverClientId = cfg && cfg.google_client_id ? cfg.google_client_id.trim() : '';
+        const localClientId = (localStorage.getItem('campus_google_client_id') || '').trim();
+        activeGoogleClientId = localClientId || serverClientId || '';
+
+        const cidInput = document.getElementById('google-client-id-input');
+        if (cidInput && activeGoogleClientId) {
+          cidInput.value = activeGoogleClientId;
+        }
+
+        if (activeGoogleClientId && window.google && window.google.accounts) {
+          // Initialize Google Identity Services (GSI)
+          google.accounts.id.initialize({
+            client_id: activeGoogleClientId,
+            callback: handleGoogleCredentialResponse,
+            hosted_domain: 'st.niituniversity.in',
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+
+          // Render official Google button if container exists
+          const officialBtnContainer = document.getElementById('g_id_signin_official');
+          if (officialBtnContainer) {
+            officialBtnContainer.innerHTML = '';
+            google.accounts.id.renderButton(officialBtnContainer, {
+              theme: 'outline',
+              size: 'large',
+              shape: 'pill',
+              text: 'signin_with',
+              logo_alignment: 'left',
+              width: 280
+            });
+          }
+
+          // Initialize Google OAuth2 token client for popup account chooser
+          if (google.accounts.oauth2) {
+            googleTokenClient = google.accounts.oauth2.initTokenClient({
+              client_id: activeGoogleClientId,
+              scope: 'openid email profile',
+              hosted_domain: 'st.niituniversity.in',
+              callback: handleGoogleTokenResponse
+            });
+          }
+
+          googleAuthInitialized = true;
+          console.log('[Google OAuth] Initialized with Client ID & hosted_domain st.niituniversity.in');
+        }
+      } catch (err) {
+        console.warn('initGoogleOAuth error:', err);
+      }
+    }
+
+    /**
+     * Saves user-entered Google Client ID, updates backend, and re-initializes
+     */
+    async function saveGoogleClientId() {
+      const input = document.getElementById('google-client-id-input');
+      const newId = input ? input.value.trim() : '';
+      if (!newId) {
+        showToast('Please enter a valid Google OAuth Client ID.', 'error');
+        return;
+      }
+
+      localStorage.setItem('campus_google_client_id', newId);
+      activeGoogleClientId = newId;
+
+      await apiRequest('/api/auth/config', {
+        method: 'POST',
+        body: JSON.stringify({ google_client_id: newId })
+      }).catch(() => {});
+
+      showToast('Google OAuth Client ID saved! Initializing Google Sign In...', 'success');
+      await initGoogleOAuth();
+
+      if (googleTokenClient) {
+        closeGoogleModal();
+        googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+      }
     }
 
     async function signOut() {
@@ -3909,6 +4113,7 @@
     // =====================================================================
     document.addEventListener('DOMContentLoaded', () => {
       initializeDateTimeInputs();
+      initGoogleOAuth();
 
       const storedUser = localStorage.getItem('user_data');
       if (storedUser && AppState.token) {
