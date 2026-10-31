@@ -220,7 +220,7 @@ def health_check():
         "timestamp": get_ist_now().isoformat(),
         "utc_now": datetime.utcnow().isoformat(),
         "ist_now": get_ist_now().isoformat(),
-        "build": "build-2026-10-31-permission-history-v3",
+        "build": "build-2026-10-31-live-sync-v4",
         "version": "2.0.0",
     }
 
@@ -259,9 +259,14 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
     now = get_ist_now()
     spaces = db.query(Space).order_by(Space.name.asc()).all()
 
-    active_statuses = [ReservationStatus.BOOKED, ReservationStatus.SCANNED]
+    active_statuses = [
+        ReservationStatus.BOOKED,
+        ReservationStatus.SCANNED,
+        ReservationStatus.PENDING_PERMISSION,
+    ]
 
     result = []
+    today_end = now.replace(hour=23, minute=59, second=59)
     for s in spaces:
         current_res = (
             db.query(Reservation)
@@ -312,12 +317,24 @@ def get_rooms_live_status(response: Response, db: Session = Depends(get_db)):
                 "is_urgent": getattr(next_res, "is_urgent", False),
             }
 
+        is_in_use_now = (current_res is not None)
+        is_reserved_today = (
+            is_in_use_now or (next_res is not None and next_res.start_time <= today_end)
+        )
+        has_upcoming = (next_res is not None)
+
+        status_str = "Occupied" if is_in_use_now else ("Reserved" if is_reserved_today else ("Upcoming" if has_upcoming else "Available"))
+
         result.append({
             "id": str(s.id),
             "name": s.name,
             "capacity": s.capacity,
             "acoustic_profile": s.acoustic_profile.value,
-            "is_occupied": current_res is not None,
+            "is_occupied": is_in_use_now,
+            "is_reserved": is_reserved_today or has_upcoming,
+            "is_reserved_today": is_reserved_today,
+            "has_upcoming": has_upcoming,
+            "status": status_str,
             "current_reservation": curr_data,
             "next_reservation": next_data,
         })
@@ -611,12 +628,38 @@ def create_booking(
             detail=f"Party size ({total_party_size}) exceeds space capacity ({space.capacity})",
         )
 
-    # Conflict-Free check
+    # Conflict-Free check: strictly block overlapping bookings for the same room
     blocking_statuses = [
         ReservationStatus.PENDING_PERMISSION,
         ReservationStatus.BOOKED,
         ReservationStatus.SCANNED,
     ]
+
+    # Pre-check: does the student already have an active reservation for ANY facility during this window?
+    user_conflict = (
+        db.query(Reservation)
+        .options(joinedload(Reservation.space))
+        .filter(
+            Reservation.user_id == current_user.id,
+            Reservation.status.in_(blocking_statuses),
+            Reservation.start_time < end_utc,
+            Reservation.end_time > start_utc,
+        )
+        .first()
+    )
+    if user_conflict:
+        space_name = user_conflict.space.name if user_conflict.space else "another facility"
+        if user_conflict.space_id == payload.space_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"You already have a reservation for this room during this timeframe ({user_conflict.start_time.strftime('%I:%M %p')} - {user_conflict.end_time.strftime('%I:%M %p')}). Booking the same room twice is not permitted.",
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"You already hold an active reservation for '{space_name}' during this timeframe ({user_conflict.start_time.strftime('%I:%M %p')} - {user_conflict.end_time.strftime('%I:%M %p')}). Booking multiple facilities at the same time is not permitted.",
+            )
+
     conflicting_res = (
         db.query(Reservation)
         .filter(
@@ -646,7 +689,7 @@ def create_booking(
         else:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="This space is already reserved for the selected timeframe. An urgent override request is required.",
+                detail="This space is already reserved for the selected timeframe. Booking the same room twice is not allowed.",
             )
     else:
         # NO CONFLICT: Empty room ALWAYS auto-approves to BOOKED immediately!

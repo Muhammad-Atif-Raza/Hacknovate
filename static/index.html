@@ -2524,9 +2524,19 @@
         if (typeof loadLiveRoomStatus === 'function') {
           loadLiveRoomStatus('student-live-status-container', true);
         }
+        if (typeof handleSearch === 'function') {
+          handleSearch();
+        }
         switchStudentTab('dashboard');
       } catch (err) {
         console.error('Booking submission error:', err);
+        const errorAlert = document.getElementById('bm-error-alert');
+        if (errorAlert) {
+          errorAlert.innerHTML = `<strong>⚠️ Booking Conflict / Error:</strong><br>${escapeHtml(err.message || 'Could not complete reservation.')}`;
+          errorAlert.style.display = 'block';
+          errorAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        showToast(err.message || 'Booking conflict: could not complete reservation.', 'error');
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Confirm & Submit Request →';
@@ -3662,6 +3672,16 @@ async function handleCancelStudentBooking(resId, roomName) {
     }
 
     // =====================================================================
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     // ALL ROOMS LIVE STATUS RADAR (STUDENT & ADMIN)
     // =====================================================================
     async function loadLiveRoomStatus(containerId, isStudentView = true) {
@@ -3680,7 +3700,8 @@ async function handleCancelStudentBooking(resId, roomName) {
         AppState.allSpaces = rooms;
         const total = rooms.length;
         const occupied = rooms.filter(r => r.is_occupied).length;
-        const available = total - occupied;
+        const reserved = rooms.filter(r => !r.is_occupied && (r.is_reserved || r.is_reserved_today || r.next_reservation)).length;
+        const available = rooms.filter(r => !r.is_occupied && !r.is_reserved && !r.is_reserved_today && !r.next_reservation).length;
         const nowFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
         let html = `
@@ -3700,17 +3721,21 @@ async function handleCancelStudentBooking(resId, roomName) {
           </div>
 
           <!-- Quick Metrics Counters -->
-          <div class="admin-stat-grid" style="margin-bottom: 1.75rem;">
+          <div class="admin-stat-grid" style="margin-bottom: 1.75rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
             <div class="stat-card">
               <span>Total Campus Rooms</span>
               <h3>${total}</h3>
             </div>
             <div class="stat-card">
-              <span>🟢 Available Now</span>
+              <span>🟢 Available All Day</span>
               <h3 style="color: var(--accent-emerald);">${available}</h3>
             </div>
             <div class="stat-card">
-              <span>🔴 Currently Occupied</span>
+              <span>🟡 Reserved Today</span>
+              <h3 style="color: #d97706;">${reserved}</h3>
+            </div>
+            <div class="stat-card">
+              <span>🔴 In-Use Now</span>
               <h3 style="color: var(--accent-rose);">${occupied}</h3>
             </div>
           </div>
@@ -3723,17 +3748,21 @@ async function handleCancelStudentBooking(resId, roomName) {
                   <span>🗺️ Campus Blueprint &bull; Interactive 2D Floor Plan</span>
                 </h3>
                 <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.2rem 0 0;">
-                  Live visual blueprint of campus room occupancy. Use the room cards below to book or request an override.
+                  Live visual blueprint of campus room occupancy. Click any room to view details or select alternative slots.
                 </p>
               </div>
-              <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; font-weight: 600;">
+              <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.8rem; font-weight: 600; flex-wrap: wrap;">
                 <span style="display: inline-flex; align-items: center; gap: 5px;">
                   <span style="width: 12px; height: 12px; border-radius: 3px; background: #dcfce7; border: 1.5px solid #15803d;"></span>
-                  Available
+                  Available All Day
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 5px;">
+                  <span style="width: 12px; height: 12px; border-radius: 3px; background: #fef3c7; border: 1.5px solid #d97706;"></span>
+                  Reserved Today
                 </span>
                 <span style="display: inline-flex; align-items: center; gap: 5px;">
                   <span style="width: 12px; height: 12px; border-radius: 3px; background: #fee2e2; border: 1.5px solid #b91c1c;"></span>
-                  Occupied
+                  In Use / Occupied
                 </span>
               </div>
             </div>
@@ -3762,19 +3791,21 @@ async function handleCancelStudentBooking(resId, roomName) {
                   const roomObj = rooms.find(r => r.name.toLowerCase().includes(cfg.key)) || rooms.find(r => r.name === cfg.name);
                   if (!roomObj) return '';
                   const isOcc = roomObj.is_occupied;
-                  const fill = isOcc ? '#fee2e2' : '#dcfce7';
-                  const stroke = isOcc ? '#b91c1c' : '#15803d';
-                  const badgeText = isOcc ? '🔴 Occupied' : '🟢 Free';
-                  const badgeFill = isOcc ? '#991b1b' : '#15803d';
+                  const isRes = !isOcc && (roomObj.is_reserved || roomObj.is_reserved_today || roomObj.next_reservation);
+                  const fill = isOcc ? '#fee2e2' : (isRes ? '#fef3c7' : '#dcfce7');
+                  const stroke = isOcc ? '#b91c1c' : (isRes ? '#d97706' : '#15803d');
+                  const badgeText = isOcc ? '🔴 In Use' : (isRes ? '🟡 Reserved' : '🟢 Free');
+                  const badgeFill = isOcc ? '#991b1b' : (isRes ? '#92400e' : '#15803d');
+                  const badgeBg = isOcc ? '#fecaca' : (isRes ? '#fde68a' : '#bbf7d0');
                   const subText = `${roomObj.capacity} Seats • ${roomObj.acoustic_profile}`;
 
                   return `
-                    <g>
+                    <g style="cursor: pointer;" onclick="handleFloorPlanRoomClick('${roomObj.id}')">
                       <rect x="${cfg.x}" y="${cfg.y}" width="${cfg.w}" height="${cfg.h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" />
                       <text x="${cfg.x + 14}" y="${cfg.y + 28}" font-size="12" font-weight="700" fill="#1E293B">${roomObj.name}</text>
                       <text x="${cfg.x + 14}" y="${cfg.y + 48}" font-size="10.5" font-weight="500" fill="#64748B">${subText}</text>
-                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="80" height="20" rx="10" fill="${isOcc ? '#fecaca' : '#bbf7d0'}" />
-                      <text x="${cfg.x + 54}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}">${badgeText}</text>
+                      <rect x="${cfg.x + 14}" y="${cfg.y + 60}" width="84" height="20" rx="10" fill="${badgeBg}" />
+                      <text x="${cfg.x + 56}" y="${cfg.y + 74}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${badgeFill}">${badgeText}</text>
                     </g>
                   `;
                 }).join('')}
@@ -3786,15 +3817,22 @@ async function handleCancelStudentBooking(resId, roomName) {
           <div class="rooms-grid">
             ${rooms.map(room => {
               const isOcc = room.is_occupied;
+              const isRes = !isOcc && (room.is_reserved || room.is_reserved_today || room.next_reservation);
               let acousticTag = 'tag-neutral';
               if (room.acoustic_profile === 'Silent') acousticTag = 'tag-blue';
               if (room.acoustic_profile === 'Collaborative') acousticTag = 'tag-emerald';
               if (room.acoustic_profile === 'Amplified') acousticTag = 'tag-amber';
 
-              const cardBorder = isOcc ? '1.5px solid #ef4444' : '1.5px solid #10b981';
+              const cardBorder = isOcc
+                ? '1.5px solid #ef4444'
+                : (isRes ? '1.5px solid #f59e0b' : '1.5px solid #10b981');
+
               const statusBadge = isOcc
                 ? '<span class="pill-tag tag-rose" style="font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #f87171;">🔴 OCCUPIED / IN USE</span>'
-                : '<span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 FREE / AVAILABLE NOW</span>';
+                : (isRes
+                    ? '<span class="pill-tag tag-amber" style="font-weight: 700; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b;">🟡 RESERVED TODAY</span>'
+                    : '<span class="pill-tag tag-emerald" style="font-weight: 700;">🟢 FREE / AVAILABLE ALL DAY</span>'
+                  );
 
               const currentRes = room.current_reservation;
               const nextRes = room.next_reservation;
@@ -3814,28 +3852,41 @@ async function handleCancelStudentBooking(resId, roomName) {
                     </div>
 
                     ${isOcc && currentRes ? `
-                      <div style="background: rgba(239, 68, 68, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
+                      <div style="background: rgba(239, 68, 68, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem; border-left: 3px solid #ef4444;">
                         <div style="color: #991b1b; font-weight: 700; margin-bottom: 0.2rem;">
-                          Occupant: ${currentRes.user_name}
+                          Occupant: ${escapeHtml(currentRes.user_name)}
                           ${currentRes.is_urgent ? '<span class="pill-tag tag-rose" style="font-size: 0.7rem; margin-left: 4px;">🚨 URGENT</span>' : ''}
                         </div>
                         <div style="color: #7f1d1d; margin-bottom: 0.2rem;">
-                          🎯 "${currentRes.purpose}"
+                          🎯 "${escapeHtml(currentRes.purpose)}"
                         </div>
                         <div style="color: #991b1b; font-size: 0.78rem;">
                           🕒 Free at: <strong>${formatDateTime(currentRes.end_time)}</strong>
                         </div>
                       </div>
+                    ` : (isRes && nextRes ? `
+                      <div style="background: rgba(245, 158, 11, 0.09); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem; border-left: 3px solid #f59e0b;">
+                        <div style="color: #92400e; font-weight: 700; margin-bottom: 0.2rem;">
+                          📅 Scheduled: ${escapeHtml(nextRes.user_name)}
+                          ${nextRes.is_urgent ? '<span class="pill-tag tag-rose" style="font-size: 0.7rem; margin-left: 4px;">🚨 URGENT</span>' : ''}
+                        </div>
+                        <div style="color: #78350f; margin-bottom: 0.2rem;">
+                          🎯 "${escapeHtml(nextRes.purpose)}"
+                        </div>
+                        <div style="color: #92400e; font-size: 0.78rem;">
+                          🕒 Reserved slot: <strong>${formatDateTime(nextRes.start_time)} - ${formatDateTime(nextRes.end_time)}</strong>
+                        </div>
+                      </div>
                     ` : `
-                      <div style="background: rgba(16, 185, 129, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
+                      <div style="background: rgba(16, 185, 129, 0.08); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.82rem; margin-bottom: 0.75rem; border-left: 3px solid #10b981;">
                         <div style="color: #065f46; font-weight: 600; margin-bottom: 0.2rem;">
                           ✨ Unoccupied and ready for instant booking.
                         </div>
                         <div style="color: #047857; font-size: 0.78rem;">
-                          ${nextRes ? `Next booking: ${formatDateTime(nextRes.start_time)}` : 'No upcoming bookings today'}
+                          No upcoming bookings scheduled for today.
                         </div>
                       </div>
-                    `}
+                    `)}
                   </div>
 
                   <div class="room-card-footer" style="padding-top: 0.75rem;">
@@ -3844,11 +3895,15 @@ async function handleCancelStudentBooking(resId, roomName) {
                         <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick="switchStudentTab('search')">
                           ⚡ Check Alternative Slots &rarr;
                         </button>
+                      ` : (isRes ? `
+                        <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem; border-color: #f59e0b; color: #92400e;" onclick="switchStudentTab('search')">
+                          ⚡ Check Other Available Time Slots &rarr;
+                        </button>
                       ` : `
                         <button class="btn-pill-dark" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='quickBookSpaceFromLive(${JSON.stringify(room)})'>
                           ⚡ Quick Book This Space &rarr;
                         </button>
-                      `
+                      `)
                     ) : `
                       <button class="btn-pill-outline" style="width: 100%; font-size: 0.82rem; padding: 0.45rem;" onclick='openRoomQRModal(${JSON.stringify(room)})'>
                         🖨️ View / Print Room QR
@@ -3877,6 +3932,23 @@ async function handleCancelStudentBooking(resId, roomName) {
       const room = rooms.find(s => String(s.id).toLowerCase() === String(roomId).toLowerCase());
       if (!room) return;
 
+      if (room.is_occupied) {
+        const currentRes = room.current_reservation;
+        if (currentRes && currentRes.status === 'Scanned') {
+          showToast(`"${room.name}" is physically checked into and cannot be overridden.`, 'info');
+          return;
+        }
+        showToast(`"${room.name}" is currently in session. Switch to Search to view alternative slots.`, 'info');
+        switchStudentTab('search');
+        return;
+      }
+
+      if (room.is_reserved || room.is_reserved_today || room.next_reservation) {
+        showToast(`"${room.name}" is reserved today. Please choose an open slot on the Search tab.`, 'info');
+        switchStudentTab('search');
+        return;
+      }
+
       // Populate default start/end times (Now + 5 mins to Now + 65 mins) and capacity = 1
       const now = new Date();
       const start = new Date(now.getTime() + 5 * 60000);
@@ -3898,16 +3970,7 @@ async function handleCancelStudentBooking(resId, roomName) {
         acousticProfile: room.acoustic_profile
       };
 
-      if (!room.is_occupied) {
-        openBookingModal(room, false);
-      } else {
-        const currentRes = room.current_reservation;
-        if (currentRes && currentRes.status === 'Scanned') {
-          showToast('Room is physically checked into and cannot be overridden.', 'info');
-          return;
-        }
-        openBookingModal(room, true);
-      }
+      openBookingModal(room, false);
     };
 
     function openOccupiedRoomModal(room) {
@@ -3927,6 +3990,11 @@ async function handleCancelStudentBooking(resId, roomName) {
     }
 
     function quickBookSpaceFromLive(room) {
+      if (room.is_occupied || room.is_reserved || room.is_reserved_today || room.next_reservation) {
+        showToast(`"${room.name}" has scheduled reservations today. Please search for an open time slot.`, 'info');
+        switchStudentTab('search');
+        return;
+      }
       initializeDateTimeInputs();
       AppState.searchParams = {
         startTime: document.getElementById('search-start').value,
